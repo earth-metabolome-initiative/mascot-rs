@@ -22,6 +22,12 @@ pub const GEMS_A10_ZENODO_RECORD_ID: u64 = GEMS_A10_TOP_100_ZENODO_RECORD_ID;
 /// DOI for the default top-100 peaks `GeMS-A10` MGF dataset.
 pub const GEMS_A10_ZENODO_DOI: &str = GEMS_A10_TOP_100_ZENODO_DOI;
 
+/// Zenodo record ID for the top-128 peaks `GeMS-A10` MGF dataset.
+pub const GEMS_A10_TOP_128_ZENODO_RECORD_ID: u64 = 20_040_772;
+
+/// DOI for the top-128 peaks `GeMS-A10` MGF dataset.
+pub const GEMS_A10_TOP_128_ZENODO_DOI: &str = "10.5281/zenodo.20040772";
+
 /// Zenodo record ID for the top-60 peaks `GeMS-A10` MGF dataset.
 pub const GEMS_A10_TOP_60_ZENODO_RECORD_ID: u64 = 20_001_888;
 
@@ -49,6 +55,8 @@ pub const GEMS_A10_MGF_PART_COUNT: u8 = 24;
 #[cfg_attr(feature = "mem_dbg", derive(mem_dbg::MemDbg))]
 #[cfg_attr(feature = "mem_size", mem_size(flat))]
 pub enum GemsA10Variant {
+    /// Larger conversion capped to the top 128 fragment peaks per spectrum.
+    Top128Peaks,
     /// Original conversion capped to the top 100 fragment peaks per spectrum.
     #[default]
     Top100Peaks,
@@ -65,6 +73,7 @@ impl GemsA10Variant {
     #[must_use]
     pub const fn record_id(self) -> u64 {
         match self {
+            Self::Top128Peaks => GEMS_A10_TOP_128_ZENODO_RECORD_ID,
             Self::Top100Peaks => GEMS_A10_TOP_100_ZENODO_RECORD_ID,
             Self::Top60Peaks => GEMS_A10_TOP_60_ZENODO_RECORD_ID,
             Self::Top40Peaks => GEMS_A10_TOP_40_ZENODO_RECORD_ID,
@@ -76,6 +85,7 @@ impl GemsA10Variant {
     #[must_use]
     pub const fn doi(self) -> &'static str {
         match self {
+            Self::Top128Peaks => GEMS_A10_TOP_128_ZENODO_DOI,
             Self::Top100Peaks => GEMS_A10_TOP_100_ZENODO_DOI,
             Self::Top60Peaks => GEMS_A10_TOP_60_ZENODO_DOI,
             Self::Top40Peaks => GEMS_A10_TOP_40_ZENODO_DOI,
@@ -85,6 +95,7 @@ impl GemsA10Variant {
 
     fn default_target_directory(self) -> PathBuf {
         let directory = match self {
+            Self::Top128Peaks => "mascot-rs-gems-a10-top-128-peaks",
             Self::Top100Peaks => "mascot-rs-gems-a10",
             Self::Top60Peaks => "mascot-rs-gems-a10-top-60-peaks",
             Self::Top40Peaks => "mascot-rs-gems-a10-top-40-peaks",
@@ -162,6 +173,12 @@ impl<P: SpectrumFloat> GemsA10Builder<P> {
             self.config.target_directory = variant.default_target_directory();
         }
         self
+    }
+
+    /// Selects the top-128 peaks conversion.
+    #[must_use]
+    pub fn top_128_peaks(self) -> Self {
+        self.variant(GemsA10Variant::Top128Peaks)
     }
 
     /// Selects the original top-100 peaks conversion.
@@ -662,6 +679,23 @@ mod tests {
             builder.selected_file_keys().first().map(String::as_str),
             Some("GeMS_A10.mgf.part-00000.mgf.zst")
         );
+        assert_eq!(
+            builder.selected_file_keys().last().map(String::as_str),
+            Some("GeMS_A10.mgf.part-00023.mgf.zst")
+        );
+    }
+
+    #[test]
+    fn selects_top_128_peaks_variant() {
+        let builder = GemsA10Builder::<f64>::default().top_128_peaks();
+
+        assert_eq!(builder.selected_variant(), GemsA10Variant::Top128Peaks);
+        assert_eq!(builder.record_id(), GEMS_A10_TOP_128_ZENODO_RECORD_ID);
+        assert_eq!(builder.doi(), GEMS_A10_TOP_128_ZENODO_DOI);
+        assert!(builder
+            .paths()
+            .first()
+            .is_some_and(|path| path.display().to_string().contains("top-128-peaks")));
         assert_eq!(
             builder.selected_file_keys().last().map(String::as_str),
             Some("GeMS_A10.mgf.part-00023.mgf.zst")

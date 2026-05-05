@@ -273,13 +273,16 @@ validated spectra with canonical `SMILES`, `INCHIKEY`, `FORMULA`, NPC,
 
 The GeMS-A10 helper is exposed through `MGFVec::<P>::gems_a10()`.
 By default it targets Zenodo record `19980668` and the 24 compressed MGF part
-files from the top-100 peaks conversion. The top-60, top-40, and top-20 peaks
-conversions are available with `MGFVec::<P>::gems_a10_top_60_peaks()`,
+files from the top-100 peaks conversion. The top-128, top-60, top-40, and
+top-20 peaks conversions are available with
+`MGFVec::<P>::gems_a10_top_128_peaks()`,
+`MGFVec::<P>::gems_a10_top_60_peaks()`,
 `MGFVec::<P>::gems_a10_top_40_peaks()`, or
-`MGFVec::<P>::gems_a10_top_20_peaks()`, and with `.top_60_peaks()`,
-`.top_40_peaks()`, or `.top_20_peaks()` on the builder. They target Zenodo
-records `20001888`, `20002962`, and `20027219`, respectively. Uncached
-downloads use `zenodo-rs` and should be awaited inside a Tokio runtime.
+`MGFVec::<P>::gems_a10_top_20_peaks()`, and with `.top_128_peaks()`,
+`.top_60_peaks()`, `.top_40_peaks()`, or `.top_20_peaks()` on the builder.
+They target Zenodo records `20040772`, `20001888`, `20002962`, and `20027219`,
+respectively. Uncached downloads use `zenodo-rs` and should be awaited inside a
+Tokio runtime.
 
 [`MascotError::SingleRecordExpected`]: crate::error::MascotError::SingleRecordExpected
 [`MGFVec`]: crate::mascot_generic_format::MGFVec

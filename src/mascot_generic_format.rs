@@ -1153,6 +1153,12 @@ impl<P: SpectrumFloat> MGFVec<P> {
         GemsA10Builder::default()
     }
 
+    /// Returns a builder for the top-128 peaks `GeMS-A10` MGF dataset on Zenodo.
+    #[must_use]
+    pub fn gems_a10_top_128_peaks() -> GemsA10Builder<P> {
+        GemsA10Builder::default().top_128_peaks()
+    }
+
     /// Returns a builder for the top-60 peaks `GeMS-A10` MGF dataset on Zenodo.
     #[must_use]
     pub fn gems_a10_top_60_peaks() -> GemsA10Builder<P> {

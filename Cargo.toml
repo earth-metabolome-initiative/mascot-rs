@@ -16,7 +16,7 @@ categories = [
 [dependencies]
 flate2 = { version = "1.0", default-features = false, features = ["rust_backend"], optional = true }
 indicatif = { version = "0.18", default-features = false, optional = true }
-mass_spectrometry = { git = "https://github.com/earth-metabolome-initiative/mass-spectrometry-traits", rev = "56805ba4ef6c29442388845faebe08669f2ad385", default-features = false }
+mass_spectrometry = { git = "https://github.com/earth-metabolome-initiative/mass-spectrometry-traits", default-features = false }
 mem_dbg = { version = "0.4", default-features = false, features = ["derive", "half"], optional = true }
 molecular-formulas = { version = "0.1.10", default-features = false }
 smiles-parser = { git = "https://github.com/earth-metabolome-initiative/smiles-parser", rev = "ad15ce7205f4e3ad842f5eaa153d562f3548bd79", default-features = false }

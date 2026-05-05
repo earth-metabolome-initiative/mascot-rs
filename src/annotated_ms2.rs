@@ -7,56 +7,200 @@ use crate::dataset::{Dataset, DatasetFuture, SingleFileDatasetConfig, SingleFile
 use crate::error::Result;
 use crate::mascot_generic_format::MGFVec;
 
-/// Zenodo record ID for the annotated harmonized MS2 MGF dataset.
-pub const ANNOTATED_MS2_ZENODO_RECORD_ID: u64 = 20_039_648;
+/// Zenodo record ID for the top-128 annotated harmonized MS2 MGF dataset.
+pub const ANNOTATED_MS2_TOP_128_ZENODO_RECORD_ID: u64 = 20_042_904;
 
-/// DOI for the annotated harmonized MS2 MGF dataset.
-pub const ANNOTATED_MS2_ZENODO_DOI: &str = "10.5281/zenodo.20039648";
+/// DOI for the top-128 annotated harmonized MS2 MGF dataset.
+pub const ANNOTATED_MS2_TOP_128_ZENODO_DOI: &str = "10.5281/zenodo.20042904";
 
-/// Current Zenodo endpoint for the annotated harmonized MS2 MGF file.
-pub const ANNOTATED_MS2_MGF_URL: &str = "https://zenodo.org/api/records/20039648/files/combined-gnps-mass-spec-gym-npc-faithful.harmonized-subset.mgf.zst/content";
+/// Zenodo endpoint for the top-128 annotated harmonized MS2 MGF file.
+pub const ANNOTATED_MS2_TOP_128_MGF_URL: &str = "https://zenodo.org/api/records/20042904/files/combined-gnps-mass-spec-gym-npc-faithful.harmonized-subset.top128.mgf.zst/content";
 
-/// File name used for the annotated harmonized MS2 MGF file.
-pub const ANNOTATED_MS2_MGF_FILE_NAME: &str =
+/// File name used for the top-128 annotated harmonized MS2 MGF file.
+pub const ANNOTATED_MS2_TOP_128_MGF_FILE_NAME: &str =
+    "combined-gnps-mass-spec-gym-npc-faithful.harmonized-subset.top128.mgf.zst";
+
+/// Number of spectra reported by the top-128 Zenodo record.
+pub const ANNOTATED_MS2_TOP_128_SPECTRA_COUNT: usize = 443_905;
+
+/// Zenodo record ID for the top-60 annotated harmonized MS2 MGF dataset.
+pub const ANNOTATED_MS2_TOP_60_ZENODO_RECORD_ID: u64 = 20_039_648;
+
+/// DOI for the top-60 annotated harmonized MS2 MGF dataset.
+pub const ANNOTATED_MS2_TOP_60_ZENODO_DOI: &str = "10.5281/zenodo.20039648";
+
+/// Zenodo endpoint for the top-60 annotated harmonized MS2 MGF file.
+pub const ANNOTATED_MS2_TOP_60_MGF_URL: &str = "https://zenodo.org/api/records/20039648/files/combined-gnps-mass-spec-gym-npc-faithful.harmonized-subset.mgf.zst/content";
+
+/// File name used for the top-60 annotated harmonized MS2 MGF file.
+pub const ANNOTATED_MS2_TOP_60_MGF_FILE_NAME: &str =
     "combined-gnps-mass-spec-gym-npc-faithful.harmonized-subset.mgf.zst";
 
-/// Number of spectra reported by the Zenodo record.
-pub const ANNOTATED_MS2_SPECTRA_COUNT: usize = 439_403;
+/// Number of spectra reported by the top-60 Zenodo record.
+pub const ANNOTATED_MS2_TOP_60_SPECTRA_COUNT: usize = 439_403;
+
+/// Zenodo record ID for the default annotated harmonized MS2 MGF dataset.
+pub const ANNOTATED_MS2_ZENODO_RECORD_ID: u64 = ANNOTATED_MS2_TOP_128_ZENODO_RECORD_ID;
+
+/// DOI for the default annotated harmonized MS2 MGF dataset.
+pub const ANNOTATED_MS2_ZENODO_DOI: &str = ANNOTATED_MS2_TOP_128_ZENODO_DOI;
+
+/// Current Zenodo endpoint for the default annotated harmonized MS2 MGF file.
+pub const ANNOTATED_MS2_MGF_URL: &str = ANNOTATED_MS2_TOP_128_MGF_URL;
+
+/// File name used for the default annotated harmonized MS2 MGF file.
+pub const ANNOTATED_MS2_MGF_FILE_NAME: &str = ANNOTATED_MS2_TOP_128_MGF_FILE_NAME;
+
+/// Number of spectra reported by the default Zenodo record.
+pub const ANNOTATED_MS2_SPECTRA_COUNT: usize = ANNOTATED_MS2_TOP_128_SPECTRA_COUNT;
+
+/// Published annotated harmonized MS2 MGF conversion variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "mem_size", derive(mem_dbg::MemSize))]
+#[cfg_attr(feature = "mem_dbg", derive(mem_dbg::MemDbg))]
+#[cfg_attr(feature = "mem_size", mem_size(flat))]
+pub enum AnnotatedMs2Variant {
+    /// Current conversion capped to the top 128 fragment peaks per spectrum.
+    #[default]
+    Top128Peaks,
+    /// Previous conversion capped to the top 60 fragment peaks per spectrum.
+    Top60Peaks,
+}
+
+impl AnnotatedMs2Variant {
+    /// Returns the Zenodo record ID for this published annotated MS2 variant.
+    #[must_use]
+    pub const fn record_id(self) -> u64 {
+        match self {
+            Self::Top128Peaks => ANNOTATED_MS2_TOP_128_ZENODO_RECORD_ID,
+            Self::Top60Peaks => ANNOTATED_MS2_TOP_60_ZENODO_RECORD_ID,
+        }
+    }
+
+    /// Returns the DOI for this published annotated MS2 variant.
+    #[must_use]
+    pub const fn doi(self) -> &'static str {
+        match self {
+            Self::Top128Peaks => ANNOTATED_MS2_TOP_128_ZENODO_DOI,
+            Self::Top60Peaks => ANNOTATED_MS2_TOP_60_ZENODO_DOI,
+        }
+    }
+
+    /// Returns the MGF download URL for this published annotated MS2 variant.
+    #[must_use]
+    pub const fn mgf_url(self) -> &'static str {
+        match self {
+            Self::Top128Peaks => ANNOTATED_MS2_TOP_128_MGF_URL,
+            Self::Top60Peaks => ANNOTATED_MS2_TOP_60_MGF_URL,
+        }
+    }
+
+    /// Returns the MGF file name for this published annotated MS2 variant.
+    #[must_use]
+    pub const fn mgf_file_name(self) -> &'static str {
+        match self {
+            Self::Top128Peaks => ANNOTATED_MS2_TOP_128_MGF_FILE_NAME,
+            Self::Top60Peaks => ANNOTATED_MS2_TOP_60_MGF_FILE_NAME,
+        }
+    }
+
+    /// Returns the reported validated spectrum count for this published variant.
+    #[must_use]
+    pub const fn spectra_count(self) -> usize {
+        match self {
+            Self::Top128Peaks => ANNOTATED_MS2_TOP_128_SPECTRA_COUNT,
+            Self::Top60Peaks => ANNOTATED_MS2_TOP_60_SPECTRA_COUNT,
+        }
+    }
+
+    fn default_target_directory(self) -> PathBuf {
+        let directory = match self {
+            Self::Top128Peaks => "mascot-rs-annotated-ms2-top-128-peaks",
+            Self::Top60Peaks => "mascot-rs-annotated-ms2",
+        };
+        std::env::temp_dir().join(directory)
+    }
+}
 
 /// Builder for downloading and loading the annotated harmonized MS2 dataset.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "mem_size", derive(mem_dbg::MemSize))]
 #[cfg_attr(feature = "mem_dbg", derive(mem_dbg::MemDbg))]
 pub struct AnnotatedMs2Builder<P: SpectrumFloat = f64> {
+    variant: AnnotatedMs2Variant,
     config: SingleFileDatasetConfig,
+    target_directory_is_default: bool,
     precision: PhantomData<fn() -> P>,
 }
 
 impl<P: SpectrumFloat> Default for AnnotatedMs2Builder<P> {
     fn default() -> Self {
+        let variant = AnnotatedMs2Variant::default();
         Self {
+            variant,
             config: SingleFileDatasetConfig::new(
-                ANNOTATED_MS2_MGF_URL,
-                std::env::temp_dir().join("mascot-rs-annotated-ms2"),
-                ANNOTATED_MS2_MGF_FILE_NAME,
+                variant.mgf_url(),
+                variant.default_target_directory(),
+                variant.mgf_file_name(),
                 "Downloading annotated MS2 MGF dataset",
             ),
+            target_directory_is_default: true,
             precision: PhantomData,
         }
     }
 }
 
 impl<P: SpectrumFloat> AnnotatedMs2Builder<P> {
+    /// Selects the published annotated MS2 conversion variant.
+    ///
+    /// If the target directory was not set explicitly, changing the variant
+    /// also switches to a variant-specific cache directory.
+    #[must_use]
+    pub fn variant(mut self, variant: AnnotatedMs2Variant) -> Self {
+        self.variant = variant;
+        self.config.set_url(variant.mgf_url());
+        self.config.set_file_name(variant.mgf_file_name());
+        if self.target_directory_is_default {
+            self.config
+                .set_target_directory(variant.default_target_directory());
+        }
+        self
+    }
+
+    /// Selects the top-128 peaks annotated MS2 conversion.
+    #[must_use]
+    pub fn top_128_peaks(self) -> Self {
+        self.variant(AnnotatedMs2Variant::Top128Peaks)
+    }
+
+    /// Selects the top-60 peaks annotated MS2 conversion.
+    #[must_use]
+    pub fn top_60_peaks(self) -> Self {
+        self.variant(AnnotatedMs2Variant::Top60Peaks)
+    }
+
+    /// Returns the selected published annotated MS2 conversion variant.
+    #[must_use]
+    pub const fn selected_variant(&self) -> AnnotatedMs2Variant {
+        self.variant
+    }
+
     /// Returns the Zenodo record ID for the annotated MS2 dataset.
     #[must_use]
     pub const fn record_id(&self) -> u64 {
-        ANNOTATED_MS2_ZENODO_RECORD_ID
+        self.variant.record_id()
     }
 
     /// Returns the DOI for the annotated MS2 dataset.
     #[must_use]
     pub const fn doi(&self) -> &'static str {
-        ANNOTATED_MS2_ZENODO_DOI
+        self.variant.doi()
+    }
+
+    /// Returns the reported validated spectrum count for the selected variant.
+    #[must_use]
+    pub const fn spectra_count(&self) -> usize {
+        self.variant.spectra_count()
     }
 
     /// Sets the source URL.
@@ -70,6 +214,7 @@ impl<P: SpectrumFloat> AnnotatedMs2Builder<P> {
     #[must_use]
     pub fn target_directory<PathLike: AsRef<Path>>(mut self, target_directory: PathLike) -> Self {
         self.config.set_target_directory(target_directory);
+        self.target_directory_is_default = false;
         self
     }
 

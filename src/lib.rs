@@ -39,11 +39,33 @@ pub mod prelude {
     #[cfg(feature = "std")]
     pub use crate::annotated_ms2::AnnotatedMs2Load;
     #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::AnnotatedMs2Variant;
+    #[cfg(feature = "std")]
     pub use crate::annotated_ms2::ANNOTATED_MS2_MGF_FILE_NAME;
     #[cfg(feature = "std")]
     pub use crate::annotated_ms2::ANNOTATED_MS2_MGF_URL;
     #[cfg(feature = "std")]
     pub use crate::annotated_ms2::ANNOTATED_MS2_SPECTRA_COUNT;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_128_MGF_FILE_NAME;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_128_MGF_URL;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_128_SPECTRA_COUNT;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_128_ZENODO_DOI;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_128_ZENODO_RECORD_ID;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_60_MGF_FILE_NAME;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_60_MGF_URL;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_60_SPECTRA_COUNT;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_60_ZENODO_DOI;
+    #[cfg(feature = "std")]
+    pub use crate::annotated_ms2::ANNOTATED_MS2_TOP_60_ZENODO_RECORD_ID;
     #[cfg(feature = "std")]
     pub use crate::annotated_ms2::ANNOTATED_MS2_ZENODO_DOI;
     #[cfg(feature = "std")]

@@ -1773,19 +1773,61 @@ fn test_gnps_builder_rejects_empty_file_name() {
 fn test_annotated_ms2_builder_defaults_to_zenodo_file() {
     let builder = MGFVec::<f64>::annotated_ms2();
 
+    assert_eq!(builder.selected_variant(), AnnotatedMs2Variant::Top128Peaks);
     assert_eq!(builder.record_id(), ANNOTATED_MS2_ZENODO_RECORD_ID);
     assert_eq!(builder.doi(), ANNOTATED_MS2_ZENODO_DOI);
-    assert_eq!(ANNOTATED_MS2_ZENODO_RECORD_ID, 20_039_648);
-    assert_eq!(ANNOTATED_MS2_ZENODO_DOI, "10.5281/zenodo.20039648");
-    assert_eq!(ANNOTATED_MS2_SPECTRA_COUNT, 439_403);
+    assert_eq!(builder.spectra_count(), ANNOTATED_MS2_SPECTRA_COUNT);
+    assert_eq!(ANNOTATED_MS2_ZENODO_RECORD_ID, 20_042_904);
+    assert_eq!(ANNOTATED_MS2_ZENODO_DOI, "10.5281/zenodo.20042904");
+    assert_eq!(ANNOTATED_MS2_SPECTRA_COUNT, 443_905);
+    assert_eq!(ANNOTATED_MS2_TOP_128_ZENODO_RECORD_ID, 20_042_904);
+    assert_eq!(ANNOTATED_MS2_TOP_128_ZENODO_DOI, "10.5281/zenodo.20042904");
+    assert_eq!(ANNOTATED_MS2_TOP_128_SPECTRA_COUNT, 443_905);
     assert_eq!(
         ANNOTATED_MS2_MGF_FILE_NAME,
-        "combined-gnps-mass-spec-gym-npc-faithful.harmonized-subset.mgf.zst"
+        "combined-gnps-mass-spec-gym-npc-faithful.harmonized-subset.top128.mgf.zst"
     );
-    assert!(ANNOTATED_MS2_MGF_URL.contains("20039648"));
+    assert!(ANNOTATED_MS2_MGF_URL.contains("20042904"));
     assert_eq!(
         builder.path().file_name().and_then(|name| name.to_str()),
         Some(ANNOTATED_MS2_MGF_FILE_NAME)
+    );
+}
+
+#[test]
+fn test_annotated_ms2_builder_selects_top_60_variant() {
+    let builder = MGFVec::<f64>::annotated_ms2_top_60_peaks();
+
+    assert_eq!(builder.selected_variant(), AnnotatedMs2Variant::Top60Peaks);
+    assert_eq!(builder.record_id(), ANNOTATED_MS2_TOP_60_ZENODO_RECORD_ID);
+    assert_eq!(builder.doi(), ANNOTATED_MS2_TOP_60_ZENODO_DOI);
+    assert_eq!(builder.spectra_count(), ANNOTATED_MS2_TOP_60_SPECTRA_COUNT);
+    assert_eq!(ANNOTATED_MS2_TOP_60_ZENODO_RECORD_ID, 20_039_648);
+    assert_eq!(ANNOTATED_MS2_TOP_60_ZENODO_DOI, "10.5281/zenodo.20039648");
+    assert_eq!(ANNOTATED_MS2_TOP_60_SPECTRA_COUNT, 439_403);
+    assert_eq!(
+        ANNOTATED_MS2_TOP_60_MGF_FILE_NAME,
+        "combined-gnps-mass-spec-gym-npc-faithful.harmonized-subset.mgf.zst"
+    );
+    assert!(ANNOTATED_MS2_TOP_60_MGF_URL.contains("20039648"));
+    assert_eq!(
+        builder.path().file_name().and_then(|name| name.to_str()),
+        Some(ANNOTATED_MS2_TOP_60_MGF_FILE_NAME)
+    );
+}
+
+#[test]
+fn test_annotated_ms2_variant_keeps_explicit_target_directory() {
+    let target_directory = std::env::temp_dir().join("custom-annotated-ms2-cache");
+    let builder = MGFVec::<f64>::annotated_ms2()
+        .target_directory(&target_directory)
+        .top_60_peaks();
+
+    assert_eq!(builder.selected_variant(), AnnotatedMs2Variant::Top60Peaks);
+    assert!(builder.path().starts_with(&target_directory));
+    assert_eq!(
+        builder.path().file_name().and_then(|name| name.to_str()),
+        Some(ANNOTATED_MS2_TOP_60_MGF_FILE_NAME)
     );
 }
 

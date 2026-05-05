@@ -1147,6 +1147,18 @@ impl<P: SpectrumFloat> MGFVec<P> {
         AnnotatedMs2Builder::default()
     }
 
+    /// Returns a builder for the top-128 annotated harmonized MS2 MGF dataset on Zenodo.
+    #[must_use]
+    pub fn annotated_ms2_top_128_peaks() -> AnnotatedMs2Builder<P> {
+        AnnotatedMs2Builder::default().top_128_peaks()
+    }
+
+    /// Returns a builder for the top-60 annotated harmonized MS2 MGF dataset on Zenodo.
+    #[must_use]
+    pub fn annotated_ms2_top_60_peaks() -> AnnotatedMs2Builder<P> {
+        AnnotatedMs2Builder::default().top_60_peaks()
+    }
+
     /// Returns a builder for the converted `GeMS-A10` MGF dataset on Zenodo.
     #[must_use]
     pub fn gems_a10() -> GemsA10Builder<P> {

@@ -188,11 +188,17 @@ pub trait Dataset {
     /// Result returned after the dataset files are present locally.
     type Download;
 
+    /// Iterator returned after the dataset files are present locally.
+    type Iter: Iterator;
+
     /// Result returned after the local dataset files are parsed.
     type Load;
 
     /// Downloads or reuses the local dataset files without parsing them.
     fn download(self) -> DatasetFuture<Self::Download>;
+
+    /// Downloads or reuses the local dataset files and returns a streaming MGF iterator.
+    fn mgf_iter(self) -> DatasetFuture<Self::Iter>;
 
     /// Downloads the dataset if needed and parses it.
     fn load(self) -> DatasetFuture<Self::Load>;

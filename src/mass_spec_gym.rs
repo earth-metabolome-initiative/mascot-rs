@@ -1,12 +1,12 @@
 use alloc::collections::VecDeque;
 use core::marker::PhantomData;
-use std::io::BufReader;
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
 use mass_spectrometry::prelude::SpectrumFloat;
 
 use crate::dataset::{Dataset, DatasetFuture, SingleFileDatasetConfig, SingleFileDatasetDownload};
-use crate::error::{MascotError, Result};
+use crate::error::Result;
 use crate::mascot_generic_format::{MGFIter, MGFLineSource, MGFReader, MGFVec};
 
 /// Current Hugging Face endpoint for the `MassSpecGym` benchmark MGF file.
@@ -17,6 +17,9 @@ pub const MASS_SPEC_GYM_MGF_FILE_NAME: &str = "MassSpecGym.mgf";
 
 /// Number of spectra reported by the `MassSpecGym` Hugging Face dataset viewer.
 pub const MASS_SPEC_GYM_SPECTRA_COUNT: usize = 231_104;
+
+/// Streaming iterator returned for the `MassSpecGym` MGF dataset.
+pub type MassSpecGymIter<P = f64> = MGFIter<P, MassSpecGymLineSource<MGFReader<Box<dyn BufRead>>>>;
 
 /// Builder for downloading and loading the `MassSpecGym` benchmark MGF dataset.
 #[derive(Debug, Clone)]
@@ -107,7 +110,13 @@ impl<P: SpectrumFloat> MassSpecGymBuilder<P> {
     /// written, or if the downloaded file cannot be read back.
     pub async fn load(self) -> Result<MassSpecGymLoad<P>> {
         let download = self.download().await?;
-        let (spectra, skipped_records) = Self::load_path(download.path())?;
+        let mut iterator = Self::iter_path(download.path())?;
+        let spectra = iterator
+            .by_ref()
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .collect();
+        let skipped_records = iterator.skipped_records();
 
         Ok(MassSpecGymLoad {
             spectra,
@@ -117,21 +126,25 @@ impl<P: SpectrumFloat> MassSpecGymBuilder<P> {
         })
     }
 
-    fn load_path(path: &Path) -> Result<(MGFVec<P>, usize)> {
-        let file = std::fs::File::open(path).map_err(|source| MascotError::Io {
-            path: path.display().to_string(),
-            source,
-        })?;
-        let source = MassSpecGymLineSource::new(MGFReader::new(BufReader::new(file)));
-        let mut iterator = MGFIter::<P, _>::from_line_source(source).skipping_invalid_records();
-        let mut records = Vec::new();
+    /// Downloads the `MassSpecGym` MGF file if needed and returns a streaming iterator.
+    ///
+    /// The returned iterator normalizes `MassSpecGym`-specific headers while it
+    /// streams records, skips malformed records, and reports the skipped count
+    /// through [`MGFIter::skipped_records`](crate::mascot_generic_format::MGFIter::skipped_records)
+    /// after it has been exhausted.
+    ///
+    /// # Errors
+    /// Returns an error if the download fails, if the target file cannot be
+    /// written, or if the downloaded file cannot be opened for streaming.
+    pub async fn mgf_iter(self) -> Result<MassSpecGymIter<P>> {
+        let download = self.download().await?;
+        Self::iter_path(download.path())
+    }
 
-        while let Some(record) = iterator.next().transpose()? {
-            records.push(record);
-        }
-
-        let skipped_records = iterator.skipped_records();
-        Ok((records.into_iter().collect(), skipped_records))
+    fn iter_path(path: &Path) -> Result<MassSpecGymIter<P>> {
+        let source =
+            MassSpecGymLineSource::new(MGFReader::new(MGFVec::<P>::reader_from_path(path)?));
+        Ok(MGFIter::<P, _>::from_line_source(source).skipping_invalid_records())
     }
 }
 
@@ -140,10 +153,15 @@ where
     P: SpectrumFloat + Send + 'static,
 {
     type Download = MassSpecGymDownload;
+    type Iter = MassSpecGymIter<P>;
     type Load = MassSpecGymLoad<P>;
 
     fn download(self) -> DatasetFuture<Self::Download> {
         Box::pin(Self::download(self))
+    }
+
+    fn mgf_iter(self) -> DatasetFuture<Self::Iter> {
+        Box::pin(Self::mgf_iter(self))
     }
 
     fn load(self) -> DatasetFuture<Self::Load> {
@@ -228,7 +246,8 @@ impl<P: SpectrumFloat> AsRef<MGFVec<P>> for MassSpecGymLoad<P> {
     }
 }
 
-struct MassSpecGymLineSource<S> {
+/// Line source that normalizes `MassSpecGym` headers before MGF parsing.
+pub struct MassSpecGymLineSource<S> {
     source: S,
     queued: VecDeque<String>,
     saw_level: bool,
@@ -317,6 +336,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+    use crate::error::MascotError;
 
     fn next_line<S>(source: &mut MassSpecGymLineSource<S>) -> Result<Option<String>>
     where
@@ -383,7 +403,7 @@ mod tests {
     }
 
     #[test]
-    fn load_path_reports_open_errors() {
+    fn iter_path_reports_open_errors() {
         let path = std::env::temp_dir().join(format!(
             "mascot-rs-missing-mass-spec-gym-{}.mgf",
             std::process::id()
@@ -391,7 +411,7 @@ mod tests {
         let _ = std::fs::remove_file(&path);
 
         assert!(matches!(
-            MassSpecGymBuilder::<f64>::load_path(&path),
+            MassSpecGymBuilder::<f64>::iter_path(&path),
             Err(MascotError::Io { .. })
         ));
     }

@@ -5,7 +5,7 @@ use mass_spectrometry::prelude::SpectrumFloat;
 
 use crate::dataset::{Dataset, DatasetFuture, SingleFileDatasetConfig, SingleFileDatasetDownload};
 use crate::error::Result;
-use crate::mascot_generic_format::MGFVec;
+use crate::mascot_generic_format::{MGFIter, MGFPathIter, MGFVec};
 
 /// Current GNPS endpoint for the aggregated public MGF spectral library.
 pub const GNPS_ALL_MGF_URL: &str = "https://external.gnps2.org/gnpslibrary/ALL_GNPS.mgf";
@@ -98,8 +98,13 @@ impl<P: SpectrumFloat> GNPSBuilder<P> {
     /// written, or if the downloaded file cannot be read back.
     pub async fn load(self) -> Result<GNPSLoad<P>> {
         let download = self.download().await?;
-
-        let (spectra, skipped_records) = Self::load_path(download.path())?;
+        let mut iterator = Self::iter_path(download.path())?;
+        let spectra = iterator
+            .by_ref()
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .collect();
+        let skipped_records = iterator.skipped_records();
 
         Ok(GNPSLoad {
             spectra,
@@ -109,8 +114,23 @@ impl<P: SpectrumFloat> GNPSBuilder<P> {
         })
     }
 
-    fn load_path(path: &Path) -> Result<(MGFVec<P>, usize)> {
-        MGFVec::<P>::from_path_skipping_invalid_records(path)
+    /// Downloads the GNPS library if needed and returns a streaming MGF iterator.
+    ///
+    /// GNPS library exports can contain empty or malformed ion blocks. The
+    /// returned iterator skips malformed records and reports the skipped count
+    /// through [`MGFIter::skipped_records`](crate::mascot_generic_format::MGFIter::skipped_records)
+    /// after it has been exhausted.
+    ///
+    /// # Errors
+    /// Returns an error if the download fails, if the target file cannot be
+    /// written, or if the downloaded file cannot be opened for streaming.
+    pub async fn mgf_iter(self) -> Result<MGFPathIter<P>> {
+        let download = self.download().await?;
+        Self::iter_path(download.path())
+    }
+
+    fn iter_path(path: &Path) -> Result<MGFPathIter<P>> {
+        MGFVec::<P>::iter_from_path(path).map(MGFIter::skipping_invalid_records)
     }
 }
 
@@ -119,10 +139,15 @@ where
     P: SpectrumFloat + Send + 'static,
 {
     type Download = GNPSDownload;
+    type Iter = MGFPathIter<P>;
     type Load = GNPSLoad<P>;
 
     fn download(self) -> DatasetFuture<Self::Download> {
         Box::pin(Self::download(self))
+    }
+
+    fn mgf_iter(self) -> DatasetFuture<Self::Iter> {
+        Box::pin(Self::mgf_iter(self))
     }
 
     fn load(self) -> DatasetFuture<Self::Load> {

@@ -85,6 +85,8 @@ pub mod prelude {
     #[cfg(feature = "std")]
     pub use crate::gems_a10::GemsA10FileLoad;
     #[cfg(feature = "std")]
+    pub use crate::gems_a10::GemsA10Iter;
+    #[cfg(feature = "std")]
     pub use crate::gems_a10::GemsA10Load;
     #[cfg(feature = "std")]
     pub use crate::gems_a10::GemsA10Variant;
@@ -123,6 +125,8 @@ pub mod prelude {
     #[cfg(feature = "std")]
     pub use crate::gnps::GNPS_ALL_MGF_URL;
     pub use crate::mascot_generic_format::MGFIter;
+    #[cfg(feature = "std")]
+    pub use crate::mascot_generic_format::MGFPathIter;
     pub use crate::mascot_generic_format::MGFVec;
     pub use crate::mascot_generic_format::MascotGenericFormat;
     pub use crate::mascot_generic_format_metadata::Instrument;
@@ -132,6 +136,8 @@ pub mod prelude {
     pub use crate::mass_spec_gym::MassSpecGymBuilder;
     #[cfg(feature = "std")]
     pub use crate::mass_spec_gym::MassSpecGymDownload;
+    #[cfg(feature = "std")]
+    pub use crate::mass_spec_gym::MassSpecGymIter;
     #[cfg(feature = "std")]
     pub use crate::mass_spec_gym::MassSpecGymLoad;
     #[cfg(feature = "std")]

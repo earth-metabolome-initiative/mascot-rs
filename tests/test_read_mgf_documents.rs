@@ -1730,6 +1730,54 @@ fn test_gnps_builder_loads_existing_downloaded_file() -> Result<()> {
 }
 
 #[test]
+fn test_gnps_builder_iterates_existing_downloaded_file() -> Result<()> {
+    let target_directory =
+        std::env::temp_dir().join(format!("mascot-rs-gnps-iter-test-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&target_directory);
+    std::fs::create_dir_all(&target_directory).map_err(|source| MascotError::Io {
+        path: target_directory.display().to_string(),
+        source,
+    })?;
+    let builder = MGFVec::<f32>::gnps()
+        .url("https://example.invalid/ALL_GNPS.mgf")
+        .target_directory(&target_directory)
+        .file_name("cached.mgf")
+        .force_download(false);
+    let path = builder.path();
+    let document = r"BEGIN IONS
+PEPMASS=0.0
+CHARGE=1
+MSLEVEL=2
+SCANS=1
+100.0 2.0
+END IONS
+BEGIN IONS
+PEPMASS=561.365
+CHARGE=1
+MSLEVEL=2
+SCANS=2
+161.0 2.216415
+END IONS
+";
+    std::fs::write(&path, document).map_err(|source| MascotError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+
+    let mut iter = pollster::block_on(<GNPSBuilder<f32> as Dataset>::mgf_iter(builder))?;
+    let first = iter.next().transpose()?.ok_or(MascotError::MissingField {
+        builder: "test",
+        field: "first_record",
+    })?;
+    assert_eq!(first.precursor_mz().to_bits(), 561.365_f32.to_bits());
+    assert!(iter.next().is_none());
+    assert_eq!(iter.skipped_records(), 1);
+    let _ = std::fs::remove_dir_all(&target_directory);
+
+    Ok(())
+}
+
+#[test]
 fn test_gnps_builder_downloads_existing_file_without_loading() -> Result<()> {
     let target_directory = std::env::temp_dir().join(format!(
         "mascot-rs-gnps-download-test-{}",
@@ -1772,8 +1820,13 @@ fn test_gnps_builder_rejects_empty_file_name() {
 #[test]
 fn test_annotated_ms2_builder_defaults_to_zenodo_file() {
     let builder = MGFVec::<f64>::annotated_ms2();
+    let top_128_builder = MGFVec::<f64>::annotated_ms2_top_128_peaks();
 
     assert_eq!(builder.selected_variant(), AnnotatedMs2Variant::Top128Peaks);
+    assert_eq!(
+        top_128_builder.selected_variant(),
+        AnnotatedMs2Variant::Top128Peaks
+    );
     assert_eq!(builder.record_id(), ANNOTATED_MS2_ZENODO_RECORD_ID);
     assert_eq!(builder.doi(), ANNOTATED_MS2_ZENODO_DOI);
     assert_eq!(builder.spectra_count(), ANNOTATED_MS2_SPECTRA_COUNT);
@@ -1908,6 +1961,57 @@ END IONS
 }
 
 #[test]
+fn test_annotated_ms2_builder_iterates_existing_downloaded_file() -> Result<()> {
+    let target_directory = std::env::temp_dir().join(format!(
+        "mascot-rs-annotated-ms2-iter-test-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&target_directory);
+    std::fs::create_dir_all(&target_directory).map_err(|source| MascotError::Io {
+        path: target_directory.display().to_string(),
+        source,
+    })?;
+    let builder = MGFVec::<f32>::annotated_ms2()
+        .url("https://example.invalid/annotated-ms2.mgf")
+        .target_directory(&target_directory)
+        .file_name("cached-annotated-ms2.mgf")
+        .force_download(false);
+    let path = builder.path();
+    let document = r"BEGIN IONS
+FEATURE_ID=annotated-iter
+PEPMASS=47.049141
+CHARGE=1+
+MSLEVEL=2
+SCANS=1
+31.0184 1.0
+45.0335 0.5
+END IONS
+BEGIN IONS
+FEATURE_ID=annotated-invalid
+PEPMASS=0.0
+MSLEVEL=2
+100.0 1.0
+END IONS
+";
+    std::fs::write(&path, document).map_err(|source| MascotError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+
+    let mut iter = pollster::block_on(<AnnotatedMs2Builder<f32> as Dataset>::mgf_iter(builder))?;
+    let first = iter.next().transpose()?.ok_or(MascotError::MissingField {
+        builder: "test",
+        field: "first_record",
+    })?;
+    assert_eq!(first.feature_id(), Some("annotated-iter"));
+    assert!(iter.next().is_none());
+    assert_eq!(iter.skipped_records(), 1);
+    let _ = std::fs::remove_dir_all(&target_directory);
+
+    Ok(())
+}
+
+#[test]
 fn test_annotated_ms2_builder_downloads_existing_file_without_loading() -> Result<()> {
     let target_directory = std::env::temp_dir().join(format!(
         "mascot-rs-annotated-ms2-download-test-{}",
@@ -2034,6 +2138,57 @@ END IONS
     assert_eq!(load.spectra()[1].ion_mode(), None);
     let spectra = load.into_spectra();
     assert_eq!(spectra.len(), 2);
+
+    Ok(())
+}
+
+#[test]
+fn test_mass_spec_gym_builder_iterates_existing_downloaded_file() -> Result<()> {
+    let target_directory = std::env::temp_dir().join(format!(
+        "mascot-rs-mass-spec-gym-iter-test-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&target_directory);
+    std::fs::create_dir_all(&target_directory).map_err(|source| MascotError::Io {
+        path: target_directory.display().to_string(),
+        source,
+    })?;
+    let builder = MGFVec::<f32>::mass_spec_gym()
+        .url("https://example.invalid/MassSpecGym.mgf")
+        .target_directory(&target_directory)
+        .force_download(false);
+    let path = builder.path();
+    let document = r"BEGIN IONS
+IDENTIFIER=MassSpecGymID0000001
+PRECURSOR_MZ=47.049141
+ADDUCT=[M+H]+
+INSTRUMENT_TYPE=Orbitrap
+31.0184 1.0
+45.0335 0.5
+END IONS
+";
+    std::fs::write(&path, document).map_err(|source| MascotError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+
+    let builder = MGFVec::<f32>::mass_spec_gym()
+        .url("https://example.invalid/MassSpecGym.mgf")
+        .target_directory(&target_directory)
+        .force_download(false);
+    let mut iter = pollster::block_on(<MassSpecGymBuilder<f32> as Dataset>::mgf_iter(builder))?;
+    let first = iter.next().transpose()?.ok_or(MascotError::MissingField {
+        builder: "test",
+        field: "first_record",
+    })?;
+    assert_eq!(first.feature_id(), Some("MassSpecGymID0000001"));
+    assert_eq!(first.level(), 2);
+    assert_eq!(first.charge(), Some(1));
+    assert_eq!(first.ion_mode(), Some(IonMode::Positive));
+    assert_eq!(first.source_instrument(), Some(Instrument::Orbitrap));
+    assert!(iter.next().is_none());
+    assert_eq!(iter.skipped_records(), 0);
+    let _ = std::fs::remove_dir_all(&target_directory);
 
     Ok(())
 }
@@ -2243,6 +2398,68 @@ END IONS
     );
     let spectra = gems_a10_load.into_spectra();
     assert_eq!(spectra.len(), 1);
+
+    Ok(())
+}
+
+#[test]
+fn test_gems_a10_builder_iterates_selected_existing_files() -> Result<()> {
+    let target_directory = std::env::temp_dir().join(format!(
+        "mascot-rs-gems-a10-iter-test-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&target_directory);
+    std::fs::create_dir_all(&target_directory).map_err(|source| MascotError::Io {
+        path: target_directory.display().to_string(),
+        source,
+    })?;
+    let builder = MGFVec::<f32>::gems_a10()
+        .target_directory(&target_directory)
+        .file_keys(["part-a.mgf", "part-b.mgf"])
+        .force_download(false);
+    let first_path = builder.path_for_file_key("part-a.mgf");
+    let second_path = builder.path_for_file_key("part-b.mgf");
+    let first_document = r"BEGIN IONS
+PEPMASS=100.0
+CHARGE=1
+MSLEVEL=2
+FEATURE_ID=gems-a
+SCANS=1
+50.0 1.0
+END IONS
+";
+    let second_document = r"BEGIN IONS
+PEPMASS=200.0
+CHARGE=1
+MSLEVEL=2
+FEATURE_ID=gems-b
+SCANS=2
+75.0 1.0
+END IONS
+";
+    std::fs::write(&first_path, first_document).map_err(|source| MascotError::Io {
+        path: first_path.display().to_string(),
+        source,
+    })?;
+    std::fs::write(&second_path, second_document).map_err(|source| MascotError::Io {
+        path: second_path.display().to_string(),
+        source,
+    })?;
+
+    let mut iter = pollster::block_on(<GemsA10Builder<f32> as Dataset>::mgf_iter(builder))?;
+    let first = iter.next().transpose()?.ok_or(MascotError::MissingField {
+        builder: "test",
+        field: "first_record",
+    })?;
+    let second = iter.next().transpose()?.ok_or(MascotError::MissingField {
+        builder: "test",
+        field: "second_record",
+    })?;
+    assert_eq!(first.feature_id(), Some("gems-a"));
+    assert_eq!(second.feature_id(), Some("gems-b"));
+    assert!(iter.next().is_none());
+    assert_eq!(iter.skipped_records(), 0);
+    let _ = std::fs::remove_dir_all(&target_directory);
 
     Ok(())
 }

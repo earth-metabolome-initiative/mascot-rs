@@ -1,4 +1,6 @@
 use core::marker::PhantomData;
+use std::collections::VecDeque;
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -8,7 +10,7 @@ use zenodo_rs::{ArtifactSelector, Auth, RecordId, TransferProgress, ZenodoClient
 
 use crate::dataset::{Dataset, DatasetFuture};
 use crate::error::{MascotError, Result};
-use crate::mascot_generic_format::MGFVec;
+use crate::mascot_generic_format::{MGFIter, MGFLineSource, MGFVec};
 
 /// Zenodo record ID for the top-100 peaks `GeMS-A10` MGF dataset.
 pub const GEMS_A10_TOP_100_ZENODO_RECORD_ID: u64 = 19_980_668;
@@ -48,6 +50,63 @@ pub const GEMS_A10_TOP_20_ZENODO_DOI: &str = "10.5281/zenodo.20027219";
 
 /// Number of compressed MGF part files in the converted `GeMS-A10` dataset.
 pub const GEMS_A10_MGF_PART_COUNT: u8 = 24;
+
+/// Streaming iterator returned for selected `GeMS-A10` MGF files.
+pub type GemsA10Iter<P = f64> = MGFIter<P, GemsA10LineSource>;
+
+/// Line source that streams the selected `GeMS-A10` MGF files as one document.
+pub struct GemsA10LineSource {
+    paths: VecDeque<PathBuf>,
+    current: Option<Box<dyn BufRead>>,
+    line: String,
+}
+
+impl GemsA10LineSource {
+    fn new(paths: Vec<PathBuf>) -> Self {
+        Self {
+            paths: paths.into(),
+            current: None,
+            line: String::new(),
+        }
+    }
+
+    fn open_next_path(&mut self) -> Result<bool> {
+        let Some(path) = self.paths.pop_front() else {
+            return Ok(false);
+        };
+        self.current = Some(MGFVec::<f64>::reader_from_path(&path)?);
+        Ok(true)
+    }
+}
+
+impl MGFLineSource for GemsA10LineSource {
+    type Line<'line>
+        = &'line str
+    where
+        Self: 'line;
+
+    fn next_line(&mut self) -> Option<Result<Self::Line<'_>>> {
+        loop {
+            if self.current.is_none() {
+                match self.open_next_path() {
+                    Ok(true) => {}
+                    Ok(false) => return None,
+                    Err(source) => return Some(Err(source)),
+                }
+            }
+
+            let current = self.current.as_mut()?;
+            self.line.clear();
+            match current.read_line(&mut self.line) {
+                Ok(0) => {
+                    self.current = None;
+                }
+                Ok(_) => return Some(Ok(self.line.trim_end_matches(['\r', '\n']))),
+                Err(source) => return Some(Err(MascotError::InputIo { source })),
+            }
+        }
+    }
+}
 
 /// Published `GeMS-A10` MGF conversion variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -424,15 +483,9 @@ impl<P: SpectrumFloat> GemsA10Builder<P> {
     /// read back.
     pub async fn load(self) -> Result<GemsA10Load<P>> {
         let download = self.download().await?;
-        let mut records = Vec::new();
-        let mut skipped_records = 0_usize;
-
-        for file in download.files() {
-            let (part_records, part_skipped_records) =
-                MGFVec::<P>::from_path_skipping_invalid_records(file.path())?;
-            records.extend(part_records);
-            skipped_records += part_skipped_records;
-        }
+        let mut iterator = Self::iter_download(&download);
+        let records = iterator.by_ref().collect::<Result<Vec<_>>>()?;
+        let skipped_records = iterator.skipped_records();
 
         Ok(GemsA10Load {
             spectra: records.into_iter().collect(),
@@ -440,6 +493,31 @@ impl<P: SpectrumFloat> GemsA10Builder<P> {
             files: download.files,
             bytes: download.bytes,
         })
+    }
+
+    /// Downloads the selected `GeMS-A10` files if needed and returns a streaming iterator.
+    ///
+    /// The returned iterator streams the selected compressed MGF part files as
+    /// one logical document, skips malformed records, and reports the skipped
+    /// count through [`MGFIter::skipped_records`](crate::mascot_generic_format::MGFIter::skipped_records)
+    /// after it has been exhausted.
+    ///
+    /// # Errors
+    /// Returns an error if the selected file list is invalid or if downloading
+    /// fails. File open and read errors after the iterator is created are
+    /// returned by the iterator itself.
+    pub async fn mgf_iter(self) -> Result<GemsA10Iter<P>> {
+        let download = self.download().await?;
+        Ok(Self::iter_download(&download))
+    }
+
+    fn iter_download(download: &GemsA10Download) -> GemsA10Iter<P> {
+        let paths = download
+            .files()
+            .iter()
+            .map(|file| file.path().to_path_buf())
+            .collect();
+        MGFIter::<P, _>::from_line_source(GemsA10LineSource::new(paths)).skipping_invalid_records()
     }
 
     fn client(&self) -> Result<ZenodoClient> {
@@ -516,10 +594,15 @@ where
     P: SpectrumFloat + Send + 'static,
 {
     type Download = GemsA10Download;
+    type Iter = GemsA10Iter<P>;
     type Load = GemsA10Load<P>;
 
     fn download(self) -> DatasetFuture<Self::Download> {
         Box::pin(Self::download(self))
+    }
+
+    fn mgf_iter(self) -> DatasetFuture<Self::Iter> {
+        Box::pin(Self::mgf_iter(self))
     }
 
     fn load(self) -> DatasetFuture<Self::Load> {
@@ -663,6 +746,7 @@ impl<P: SpectrumFloat> AsRef<MGFVec<P>> for GemsA10Load<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufRead, Read};
 
     #[test]
     fn default_builder_selects_all_published_parts() {
@@ -764,6 +848,51 @@ mod tests {
             builder.path_for_file_key("cached.mgf"),
             target_directory.join("cached.mgf")
         );
+    }
+
+    #[test]
+    fn line_source_reports_missing_path_errors() {
+        let path = std::env::temp_dir().join(format!(
+            "mascot-rs-missing-gems-a10-source-{}.mgf",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let mut source = GemsA10LineSource::new(vec![path]);
+
+        assert!(matches!(
+            source.next_line(),
+            Some(Err(MascotError::Io { .. }))
+        ));
+    }
+
+    #[test]
+    fn line_source_reports_read_errors() {
+        struct FailingBufRead;
+
+        impl Read for FailingBufRead {
+            fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::other("forced read failure"))
+            }
+        }
+
+        impl BufRead for FailingBufRead {
+            fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+                Err(std::io::Error::other("forced buffer failure"))
+            }
+
+            fn consume(&mut self, _amount: usize) {}
+        }
+
+        let mut source = GemsA10LineSource {
+            paths: VecDeque::new(),
+            current: Some(Box::new(FailingBufRead)),
+            line: String::new(),
+        };
+
+        assert!(matches!(
+            source.next_line(),
+            Some(Err(MascotError::InputIo { .. }))
+        ));
     }
 
     #[test]

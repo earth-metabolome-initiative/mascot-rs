@@ -885,7 +885,7 @@ impl<P: SpectrumFloat> MGFVec<P> {
     }
 
     #[cfg(feature = "std")]
-    fn reader_from_path(path: &Path) -> Result<Box<dyn BufRead>> {
+    pub(crate) fn reader_from_path(path: &Path) -> Result<Box<dyn BufRead>> {
         let file = File::open(path).map_err(|source| MascotError::Io {
             path: path.display().to_string(),
             source,
@@ -1036,34 +1036,6 @@ impl<P: SpectrumFloat> MGFVec<P> {
                 MGFStrLines::from_iterator(iter.into_iter()),
             ),
         )
-    }
-
-    #[cfg(feature = "std")]
-    pub(crate) fn from_reader_skipping_invalid_records<R>(reader: R) -> Result<(Self, usize)>
-    where
-        R: BufRead,
-    {
-        let mut iterator =
-            MGFIter::<P, MGFReader<R>>::from_reader(reader).skipping_invalid_records();
-        let mut mascot_generic_formats = Vec::new();
-
-        while let Some(record) = iterator.next().transpose()? {
-            mascot_generic_formats.push(record);
-        }
-
-        let skipped_records = iterator.skipped_records();
-
-        Ok((
-            Self {
-                mascot_generic_formats,
-            },
-            skipped_records,
-        ))
-    }
-
-    #[cfg(feature = "std")]
-    pub(crate) fn from_path_skipping_invalid_records(path: &Path) -> Result<(Self, usize)> {
-        Self::from_reader_skipping_invalid_records(Self::reader_from_path(path)?)
     }
 
     /// Returns an iterator over the MGF records in the collection.

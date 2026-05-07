@@ -246,7 +246,8 @@ assert_eq!(spectrum.mz_nth(0).to_bits(), 100.0_f32.to_bits());
 
 The GNPS helper is exposed through `MGFVec::<P>::gnps()`. Dataset builders
 implement `Dataset`: `download()` only ensures that the local file exists,
-while `load()` downloads if needed and parses the MGF records.
+`mgf_iter()` downloads if needed and streams records through `MGFIter`, while
+`load()` downloads if needed and parses the MGF records into memory.
 The builder supports `.target_directory(...)`, `.file_name(...)`, `.verbose()`,
 and `.force_download(...)`.
 

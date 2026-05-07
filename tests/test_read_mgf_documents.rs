@@ -2,6 +2,18 @@
 
 use mascot_rs::prelude::*;
 
+fn block_on_dataset<T>(future: impl std::future::Future<Output = Result<T>>) -> Result<T> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|source| MascotError::Io {
+            path: "tokio runtime".to_owned(),
+            source,
+        })?;
+
+    runtime.block_on(future)
+}
+
 #[test]
 fn test_read_mgf_documents() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut mgf_files: Vec<String> = Vec::new();
@@ -1709,7 +1721,7 @@ fn test_gnps_builder_loads_existing_downloaded_file() -> Result<()> {
     })?;
     let expected_bytes = document.len() as u64;
 
-    let gnps_load = pollster::block_on(builder.load())?;
+    let gnps_load = block_on_dataset(builder.load())?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert!(gnps_load.mem_size(SizeFlags::default()) >= std::mem::size_of_val(&gnps_load));
@@ -1764,7 +1776,7 @@ END IONS
         source,
     })?;
 
-    let mut iter = pollster::block_on(<GNPSBuilder<f32> as Dataset>::mgf_iter(builder))?;
+    let mut iter = block_on_dataset(<GNPSBuilder<f32> as Dataset>::mgf_iter(builder))?;
     let first = iter.next().transpose()?.ok_or(MascotError::MissingField {
         builder: "test",
         field: "first_record",
@@ -1800,7 +1812,7 @@ fn test_gnps_builder_downloads_existing_file_without_loading() -> Result<()> {
         source,
     })?;
 
-    let download = pollster::block_on(<GNPSBuilder<f32> as Dataset>::download(builder))?;
+    let download = block_on_dataset(<GNPSBuilder<f32> as Dataset>::download(builder))?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert_eq!(download.path(), path.as_path());
@@ -1812,7 +1824,7 @@ fn test_gnps_builder_downloads_existing_file_without_loading() -> Result<()> {
 #[test]
 fn test_gnps_builder_rejects_empty_file_name() {
     assert!(matches!(
-        pollster::block_on(MGFVec::<f64>::gnps().file_name("").load()),
+        block_on_dataset(MGFVec::<f64>::gnps().file_name("").load()),
         Err(MascotError::EmptyFilename)
     ));
 }
@@ -1931,7 +1943,7 @@ END IONS
     })?;
     let expected_bytes = document.len() as u64;
 
-    let load = pollster::block_on(Dataset::load(builder))?;
+    let load = block_on_dataset(Dataset::load(builder))?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert!(load.mem_size(SizeFlags::default()) >= std::mem::size_of_val(&load));
@@ -1998,7 +2010,7 @@ END IONS
         source,
     })?;
 
-    let mut iter = pollster::block_on(<AnnotatedMs2Builder<f32> as Dataset>::mgf_iter(builder))?;
+    let mut iter = block_on_dataset(<AnnotatedMs2Builder<f32> as Dataset>::mgf_iter(builder))?;
     let first = iter.next().transpose()?.ok_or(MascotError::MissingField {
         builder: "test",
         field: "first_record",
@@ -2034,7 +2046,7 @@ fn test_annotated_ms2_builder_downloads_existing_file_without_loading() -> Resul
         source,
     })?;
 
-    let download = pollster::block_on(<AnnotatedMs2Builder<f32> as Dataset>::download(builder))?;
+    let download = block_on_dataset(<AnnotatedMs2Builder<f32> as Dataset>::download(builder))?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert_eq!(download.path(), path.as_path());
@@ -2046,7 +2058,7 @@ fn test_annotated_ms2_builder_downloads_existing_file_without_loading() -> Resul
 #[test]
 fn test_annotated_ms2_builder_rejects_empty_file_name() {
     assert!(matches!(
-        pollster::block_on(MGFVec::<f64>::annotated_ms2().file_name("").load()),
+        block_on_dataset(MGFVec::<f64>::annotated_ms2().file_name("").load()),
         Err(MascotError::EmptyFilename)
     ));
 }
@@ -2104,7 +2116,7 @@ END IONS
     })?;
     let expected_bytes = document.len() as u64;
 
-    let load = pollster::block_on(Dataset::load(builder))?;
+    let load = block_on_dataset(Dataset::load(builder))?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert!(load.mem_size(SizeFlags::default()) >= std::mem::size_of_val(&load));
@@ -2176,7 +2188,7 @@ END IONS
         .url("https://example.invalid/MassSpecGym.mgf")
         .target_directory(&target_directory)
         .force_download(false);
-    let mut iter = pollster::block_on(<MassSpecGymBuilder<f32> as Dataset>::mgf_iter(builder))?;
+    let mut iter = block_on_dataset(<MassSpecGymBuilder<f32> as Dataset>::mgf_iter(builder))?;
     let first = iter.next().transpose()?.ok_or(MascotError::MissingField {
         builder: "test",
         field: "first_record",
@@ -2216,7 +2228,7 @@ fn test_mass_spec_gym_builder_downloads_existing_file_without_loading() -> Resul
         source,
     })?;
 
-    let download = pollster::block_on(<MassSpecGymBuilder<f32> as Dataset>::download(builder))?;
+    let download = block_on_dataset(<MassSpecGymBuilder<f32> as Dataset>::download(builder))?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert_eq!(download.path(), path.as_path());
@@ -2228,7 +2240,7 @@ fn test_mass_spec_gym_builder_downloads_existing_file_without_loading() -> Resul
 #[test]
 fn test_mass_spec_gym_builder_rejects_empty_file_name() {
     assert!(matches!(
-        pollster::block_on(MGFVec::<f64>::mass_spec_gym().file_name("").load()),
+        block_on_dataset(MGFVec::<f64>::mass_spec_gym().file_name("").load()),
         Err(MascotError::EmptyFilename)
     ));
 }
@@ -2380,7 +2392,7 @@ END IONS
     })?;
     let expected_bytes = document.len() as u64;
 
-    let gems_a10_load = pollster::block_on(builder.load())?;
+    let gems_a10_load = block_on_dataset(builder.load())?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert!(gems_a10_load.mem_size(SizeFlags::default()) >= std::mem::size_of_val(&gems_a10_load));
@@ -2446,7 +2458,7 @@ END IONS
         source,
     })?;
 
-    let mut iter = pollster::block_on(<GemsA10Builder<f32> as Dataset>::mgf_iter(builder))?;
+    let mut iter = block_on_dataset(<GemsA10Builder<f32> as Dataset>::mgf_iter(builder))?;
     let first = iter.next().transpose()?.ok_or(MascotError::MissingField {
         builder: "test",
         field: "first_record",
@@ -2486,7 +2498,7 @@ fn test_gems_a10_builder_downloads_existing_file_without_loading() -> Result<()>
         source,
     })?;
 
-    let download = pollster::block_on(<GemsA10Builder<f32> as Dataset>::download(builder))?;
+    let download = block_on_dataset(<GemsA10Builder<f32> as Dataset>::download(builder))?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert_eq!(download.files().len(), 1);
@@ -2501,7 +2513,7 @@ fn test_gems_a10_builder_downloads_existing_file_without_loading() -> Result<()>
 #[test]
 fn test_gems_a10_builder_rejects_empty_file_selection() {
     assert!(matches!(
-        pollster::block_on(
+        block_on_dataset(
             MGFVec::<f64>::gems_a10()
                 .file_keys(core::iter::empty::<&str>())
                 .load()
@@ -2512,7 +2524,7 @@ fn test_gems_a10_builder_rejects_empty_file_selection() {
         })
     ));
     assert!(matches!(
-        pollster::block_on(MGFVec::<f64>::gems_a10().file_key("").load()),
+        block_on_dataset(MGFVec::<f64>::gems_a10().file_key("").load()),
         Err(MascotError::EmptyFilename)
     ));
 }

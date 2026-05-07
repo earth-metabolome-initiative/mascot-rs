@@ -22,11 +22,11 @@ molecular-formulas = { version = "0.1.10", default-features = false }
 smiles-parser = { git = "https://github.com/earth-metabolome-initiative/smiles-parser", rev = "ad15ce7205f4e3ad842f5eaa153d562f3548bd79", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 ureq = { version = "3.3", optional = true }
-zenodo-rs = { version = "0.1.6", default-features = false, features = ["checksums", "rustls-tls"], optional = true }
+zenodo-rs = { version = "0.1.7", default-features = false, features = ["checksums", "rustls-ring-tls"], optional = true }
 zstd = { version = "0.13", default-features = false, optional = true }
 
 [dev-dependencies]
-pollster = "0.4"
+tokio = { version = "1", features = ["net", "rt", "time"] }
 
 [features]
 default = ["std", "mem_dbg"]

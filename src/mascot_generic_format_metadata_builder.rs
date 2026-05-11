@@ -986,6 +986,7 @@ impl<P: SpectrumFloat> MascotGenericFormatMetadataBuilder<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
 
     #[test]
     fn can_parse_expected_metadata_lines() {
@@ -1114,6 +1115,169 @@ mod tests {
             mascot_generic_format_metadata.arbitrary_metadata_value("UNKNOWN"),
             None
         );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_empty_feature_id_and_precursor_values() {
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+        assert!(matches!(
+            parser.digest_line("FEATURE_ID= "),
+            Err(MascotError::ParseField {
+                field: "feature ID",
+                ..
+            })
+        ));
+
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+        assert!(matches!(
+            parser.digest_precursor_mz_line(PrecursorMzSource::Pepmass, " ", "PEPMASS= "),
+            Err(MascotError::ParseField {
+                field: "precursor m/z",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn tracks_precursor_mz_precision_with_signs_and_exponents() {
+        assert_eq!(
+            MascotGenericFormatMetadataBuilder::<f64>::precursor_mz_precision("+1.230e2"),
+            4
+        );
+        assert_eq!(
+            MascotGenericFormatMetadataBuilder::<f64>::precursor_mz_precision("-12.30E-1"),
+            4
+        );
+    }
+
+    #[test]
+    fn updates_precursor_source_when_repeated_value_has_more_precision() -> Result<()> {
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+
+        parser.digest_precursor_mz_line(PrecursorMzSource::Pepmass, "1.0", "PEPMASS=1.0")?;
+        parser.digest_precursor_mz_line(
+            PrecursorMzSource::PrecursorMz,
+            "1.0000",
+            "PRECURSOR_MZ=1.0000",
+        )?;
+
+        assert_eq!(
+            parser.precursor_mz_source,
+            Some(PrecursorMzSource::PrecursorMz)
+        );
+        assert_eq!(parser.precursor_mz_precision, Some(5));
+
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_invalid_ms_level_values() {
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+        assert!(matches!(
+            parser.digest_line("MSLEVEL=MSx"),
+            Err(MascotError::ParseField {
+                field: "fragmentation level",
+                ..
+            })
+        ));
+
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+        assert!(matches!(
+            parser.digest_line("MSLEVEL=0"),
+            Err(MascotError::NonPositiveField {
+                field: "fragmentation level",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn ignores_missing_optional_metadata_markers() -> Result<()> {
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+
+        parser.digest_line("SCANS=-1")?;
+        parser.digest_line("IONMODE=N/A")?;
+        parser.digest_line("SOURCE_INSTRUMENT=N/A-N/A")?;
+
+        assert_eq!(parser.scans, None);
+        assert_eq!(parser.ion_mode, None);
+        assert_eq!(parser.source_instrument, None);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_invalid_ion_mode_values() {
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+
+        assert!(matches!(
+            parser.digest_line("IONMODE=sideways"),
+            Err(MascotError::ParseField {
+                field: "ion mode",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_edge_case_charge_syntax() {
+        for line in ["CHARGE=+1+", "CHARGE=abc+", "CHARGE=128+", "CHARGE=129-"] {
+            let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+            assert!(
+                matches!(
+                    parser.digest_line(line),
+                    Err(MascotError::InvalidCharge { .. })
+                ),
+                "{line}"
+            );
+        }
+
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+        assert!(matches!(
+            parser.digest_line("CHARGE=not-a-charge"),
+            Err(MascotError::InvalidCharge { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_malformed_merged_scan_metadata() {
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+        assert!(matches!(
+            parser.digest_arbitrary_metadata_line("MERGED_SCANS"),
+            Err(MascotError::UnsupportedLine { .. })
+        ));
+
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+        assert!(matches!(
+            parser.digest_line("MERGED_SCANS=1,a"),
+            Err(MascotError::ParseField {
+                field: "merged scan numbers",
+                ..
+            })
+        ));
+
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+        assert!(matches!(
+            parser.digest_line(
+                "MERGED_STATS=not / 2 (0 removed due to low quality, 0 removed due to low cosine)."
+            ),
+            Err(MascotError::ParseField { .. } | MascotError::UnsupportedLine { .. })
+        ));
+    }
+
+    #[test]
+    fn digest_metadata_pair_reports_whether_value_is_arbitrary() -> Result<()> {
+        let metadata =
+            MascotGenericFormatMetadata::new(Some("1".to_string()), 2, None, Some(1), None)?;
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::from_metadata(&metadata);
+
+        assert!(!parser.digest_metadata_pair("IONMODE", "positive")?);
+        assert!(parser.digest_metadata_pair("NAME", "Ethanol")?);
+        assert!(matches!(
+            parser.digest_metadata_pair("PEPMASS", "250.0"),
+            Err(MascotError::RecordFieldNotMetadata { .. })
+        ));
+
         Ok(())
     }
 

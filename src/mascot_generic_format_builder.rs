@@ -175,6 +175,30 @@ mod tests {
     }
 
     #[test]
+    fn peak_line_parser_rejects_missing_values_and_filters_zero_intensity() -> Result<()> {
+        let mut builder = MascotGenericFormatBuilder::<f64>::default();
+
+        assert!(matches!(
+            builder.digest_peak_line(""),
+            Err(MascotError::ParseField {
+                field: "mass divided by charge ratio",
+                ..
+            })
+        ));
+        assert!(matches!(
+            builder.digest_peak_line("100.0"),
+            Err(MascotError::ParseField {
+                field: "fragment intensity",
+                ..
+            })
+        ));
+        builder.digest_peak_line("100.0 0.0")?;
+        assert!(builder.peaks.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
     fn filters_zero_intensity_peak_lines() -> Result<()> {
         let mut builder = MascotGenericFormatBuilder::<f64>::default();
         builder.digest_line("BEGIN IONS")?;

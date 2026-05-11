@@ -58,3 +58,19 @@ pub fn validate_positive_f64(value: f64, field: &'static str, line: &str) -> Res
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_values_not_representable_in_requested_precision() {
+        assert!(matches!(
+            parse_positive_spectrum_float::<f32>("1e100", "precursor m/z", "PEPMASS=1e100"),
+            Err(MascotError::UnrepresentablePrecisionField {
+                field: "precursor m/z",
+                ..
+            })
+        ));
+    }
+}

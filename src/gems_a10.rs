@@ -748,6 +748,18 @@ mod tests {
     use super::*;
     use std::io::{BufRead, Read};
 
+    fn block_on_dataset<T>(future: impl std::future::Future<Output = Result<T>>) -> Result<T> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|source| MascotError::Io {
+                path: "tokio runtime".to_owned(),
+                source,
+            })?;
+
+        runtime.block_on(future)
+    }
+
     #[test]
     fn default_builder_selects_all_published_parts() {
         let builder = GemsA10Builder::<f64>::default();
@@ -767,6 +779,47 @@ mod tests {
             builder.selected_file_keys().last().map(String::as_str),
             Some("GeMS_A10.mgf.part-00023.mgf.zst")
         );
+    }
+
+    #[test]
+    fn builder_setters_update_paths_and_client_options() -> Result<()> {
+        let target_directory = PathBuf::from("custom-gems-a10-cache");
+        let builder = GemsA10Builder::<f32>::default()
+            .top_100_peaks()
+            .target_directory(&target_directory)
+            .part(3)?
+            .all_parts()
+            .parts([1, 2])?
+            .token("test-token")
+            .request_timeout(Duration::from_millis(250))
+            .connect_timeout(Duration::from_millis(125))
+            .verbose()
+            .force_download(true);
+
+        assert_eq!(builder.selected_variant(), GemsA10Variant::Top100Peaks);
+        assert_eq!(
+            builder.selected_file_keys(),
+            &[
+                "GeMS_A10.mgf.part-00001.mgf.zst".to_string(),
+                "GeMS_A10.mgf.part-00002.mgf.zst".to_string(),
+            ]
+        );
+        assert_eq!(
+            builder.path_for_file_key("selected.mgf"),
+            target_directory.join("selected.mgf")
+        );
+        let _client = builder.client()?;
+
+        let quiet_progress = GemsA10Builder::<f32>::default().progress("quiet.mgf");
+        quiet_progress.begin(Some(10));
+        quiet_progress.advance(5);
+        quiet_progress.finish();
+        let progress = builder.progress("selected.mgf");
+        progress.begin(Some(10));
+        progress.advance(5);
+        progress.finish();
+
+        Ok(())
     }
 
     #[test]
@@ -905,6 +958,108 @@ mod tests {
             GemsA10Builder::<f64>::part_file_key(GEMS_A10_MGF_PART_COUNT),
             Err(MascotError::InvalidGemsA10Part { .. })
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn download_reuses_multiple_cached_files() -> Result<()> {
+        let target_directory = std::env::temp_dir().join(format!(
+            "mascot-rs-gems-a10-unit-download-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&target_directory);
+        std::fs::create_dir_all(&target_directory).map_err(|source| MascotError::Io {
+            path: target_directory.display().to_string(),
+            source,
+        })?;
+        let builder = GemsA10Builder::<f64>::default()
+            .target_directory(&target_directory)
+            .parts([0, 1])?;
+        let first_path = builder.path_for_file_key("GeMS_A10.mgf.part-00000.mgf.zst");
+        let second_path = builder.path_for_file_key("GeMS_A10.mgf.part-00001.mgf.zst");
+        std::fs::write(&first_path, b"first").map_err(|source| MascotError::Io {
+            path: first_path.display().to_string(),
+            source,
+        })?;
+        std::fs::write(&second_path, b"second").map_err(|source| MascotError::Io {
+            path: second_path.display().to_string(),
+            source,
+        })?;
+
+        let download = block_on_dataset(builder.download())?;
+        std::fs::remove_dir_all(&target_directory).map_err(|source| MascotError::Io {
+            path: target_directory.display().to_string(),
+            source,
+        })?;
+
+        assert_eq!(download.files().len(), 2);
+        assert_eq!(download.files()[0].key(), "GeMS_A10.mgf.part-00000.mgf.zst");
+        assert_eq!(download.files()[0].path(), first_path.as_path());
+        assert_eq!(download.files()[0].bytes(), 5);
+        assert_eq!(download.files()[1].key(), "GeMS_A10.mgf.part-00001.mgf.zst");
+        assert_eq!(download.files()[1].path(), second_path.as_path());
+        assert_eq!(download.files()[1].bytes(), 6);
+        assert_eq!(download.bytes(), 11);
+
+        Ok(())
+    }
+
+    #[test]
+    fn download_reports_target_directory_errors() -> Result<()> {
+        let target_directory = std::env::temp_dir().join(format!(
+            "mascot-rs-gems-a10-directory-error-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&target_directory);
+        std::fs::write(&target_directory, b"not a directory").map_err(|source| {
+            MascotError::Io {
+                path: target_directory.display().to_string(),
+                source,
+            }
+        })?;
+        let builder = GemsA10Builder::<f64>::default()
+            .target_directory(&target_directory)
+            .file_key("cached.mgf");
+
+        let result = block_on_dataset(builder.download());
+        std::fs::remove_file(&target_directory).map_err(|source| MascotError::Io {
+            path: target_directory.display().to_string(),
+            source,
+        })?;
+
+        assert!(matches!(result, Err(MascotError::Io { .. })));
+
+        Ok(())
+    }
+
+    #[test]
+    fn download_file_reports_parent_directory_errors() -> Result<()> {
+        let target_directory = std::env::temp_dir().join(format!(
+            "mascot-rs-gems-a10-parent-error-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&target_directory);
+        std::fs::create_dir_all(&target_directory).map_err(|source| MascotError::Io {
+            path: target_directory.display().to_string(),
+            source,
+        })?;
+        let parent = target_directory.join("parent-file");
+        std::fs::write(&parent, b"not a directory").map_err(|source| MascotError::Io {
+            path: parent.display().to_string(),
+            source,
+        })?;
+        let path = parent.join("file.mgf.zst");
+        let builder = GemsA10Builder::<f64>::default();
+        let client = builder.client()?;
+
+        let result = block_on_dataset(builder.download_file(&client, "missing.mgf.zst", &path));
+        std::fs::remove_dir_all(&target_directory).map_err(|source| MascotError::Io {
+            path: target_directory.display().to_string(),
+            source,
+        })?;
+
+        assert!(matches!(result, Err(MascotError::Io { .. })));
+
         Ok(())
     }
 }

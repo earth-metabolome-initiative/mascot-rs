@@ -1320,3 +1320,72 @@ impl<P: SpectrumFloat> Index<usize> for MGFVec<P> {
         &self.mascot_generic_formats[index]
     }
 }
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use super::*;
+
+    fn sample_record() -> Result<MascotGenericFormat<f64>> {
+        concat!(
+            "BEGIN IONS\n",
+            "FEATURE_ID=unit\n",
+            "PEPMASS=500.0\n",
+            "CHARGE=1\n",
+            "MSLEVEL=2\n",
+            "100.0 2.0\n",
+            "SCANS=1\n",
+            "END IONS\n",
+        )
+        .parse()
+    }
+
+    #[test]
+    fn with_capacity_allocates_empty_record() -> Result<()> {
+        let record = MascotGenericFormat::<f64>::with_capacity(250.0, 4)?;
+
+        assert_eq!(record.len(), 0);
+        assert_eq!(record.level(), 2);
+        assert_eq!(record.precursor_mz().to_bits(), 250.0_f64.to_bits());
+
+        Ok(())
+    }
+
+    #[test]
+    fn iterator_over_empty_document_is_fused() {
+        let mut iterator = MGFIter::<f64, _>::from_document("");
+
+        assert!(iterator.next().is_none());
+        assert!(iterator.next().is_none());
+    }
+
+    #[test]
+    fn writes_record_and_collection_to_all_path_compressions(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let target_directory = std::env::temp_dir().join(format!(
+            "mascot-rs-mgf-module-write-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&target_directory);
+        std::fs::create_dir_all(&target_directory)?;
+        let record = sample_record()?;
+        let collection = MGFVec::from(vec![sample_record()?]);
+        let plain_path = target_directory.join("record.mgf");
+        let zstd_path = target_directory.join("records.mgf.zst");
+        let gzip_path = target_directory.join("record.mgf.gz");
+
+        record.to_path(&plain_path)?;
+        collection.to_path(&zstd_path)?;
+        record.to_path(&gzip_path)?;
+
+        let plain: MGFVec = MGFVec::from_path(&plain_path)?;
+        let zstd: MGFVec = MGFVec::from_path(&zstd_path)?;
+        let gzip: MGFVec = MGFVec::from_path(&gzip_path)?;
+        std::fs::remove_dir_all(&target_directory)?;
+
+        assert_eq!(plain.len(), 1);
+        assert_eq!(zstd.len(), 1);
+        assert_eq!(gzip.len(), 1);
+
+        Ok(())
+    }
+}

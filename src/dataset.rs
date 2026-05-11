@@ -208,6 +208,10 @@ pub trait Dataset {
 mod tests {
     use super::*;
 
+    fn unique_temp_directory(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("{name}-{}", std::process::id()))
+    }
+
     #[test]
     fn progress_bar_respects_verbose_flag() {
         let quiet = SingleFileDatasetConfig::new(
@@ -242,6 +246,119 @@ mod tests {
         let response =
             ureq::http::Response::builder().body(ureq::Body::builder().data(Vec::new()))?;
         assert_eq!(SingleFileDatasetConfig::content_length(&response), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn download_reuses_cached_file() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let target_directory = unique_temp_directory("mascot-rs-single-file-cache-test");
+        let _ = std::fs::remove_dir_all(&target_directory);
+        std::fs::create_dir_all(&target_directory)?;
+        let config = SingleFileDatasetConfig::new(
+            "https://example.invalid/file.mgf",
+            target_directory.clone(),
+            "cached.mgf",
+            "Downloading cached file",
+        );
+        let path = config.path();
+        let contents = b"cached contents\n";
+        std::fs::write(&path, contents)?;
+
+        let download = config.download()?;
+        let (downloaded_path, downloaded_bytes) = download.into_parts();
+        std::fs::remove_dir_all(&target_directory)?;
+
+        assert_eq!(downloaded_path, path);
+        assert_eq!(downloaded_bytes, contents.len() as u64);
+
+        Ok(())
+    }
+
+    #[test]
+    fn download_reports_target_directory_errors(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let target_directory = unique_temp_directory("mascot-rs-single-file-directory-error-test");
+        let _ = std::fs::remove_dir_all(&target_directory);
+        std::fs::write(&target_directory, b"not a directory")?;
+        let config = SingleFileDatasetConfig::new(
+            "https://example.invalid/file.mgf",
+            target_directory.clone(),
+            "cached.mgf",
+            "Downloading cached file",
+        );
+
+        let result = config.download();
+        std::fs::remove_file(&target_directory)?;
+
+        assert!(matches!(result, Err(MascotError::Io { .. })));
+
+        Ok(())
+    }
+
+    #[test]
+    fn download_reports_http_errors() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0))?;
+        let url = format!("http://{}/file.mgf", listener.local_addr()?);
+        drop(listener);
+        let target_directory = unique_temp_directory("mascot-rs-single-file-download-error-test");
+        let _ = std::fs::remove_dir_all(&target_directory);
+        let mut config = SingleFileDatasetConfig::new(
+            &url,
+            target_directory,
+            "downloaded.mgf",
+            "Downloading test file",
+        );
+        config.set_force_download(true);
+
+        assert!(matches!(
+            config.download(),
+            Err(MascotError::Download { .. })
+        ));
+        let _ = std::fs::remove_dir_all(config.target_directory);
+
+        Ok(())
+    }
+
+    #[test]
+    fn download_fetches_file_from_http_server(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let target_directory = unique_temp_directory("mascot-rs-single-file-http-test");
+        let _ = std::fs::remove_dir_all(&target_directory);
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0))?;
+        let url = format!("http://{}/file.mgf", listener.local_addr()?);
+        let body = b"downloaded contents\n";
+        let server = std::thread::spawn(move || -> std::io::Result<()> {
+            let (mut stream, _) = listener.accept()?;
+            stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+            let mut request_buffer = [0_u8; 1024];
+            let _ = stream.read(&mut request_buffer)?;
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            stream.write_all(header.as_bytes())?;
+            stream.write_all(body)?;
+            stream.flush()
+        });
+
+        let mut config = SingleFileDatasetConfig::new(
+            &url,
+            target_directory.clone(),
+            "downloaded.mgf",
+            "Downloading test file",
+        );
+        config.enable_verbose();
+        let download = config.download()?;
+        server
+            .join()
+            .map_err(|_| std::io::Error::other("HTTP server thread panicked"))??;
+        let (downloaded_path, downloaded_bytes) = download.into_parts();
+        let downloaded_contents = std::fs::read(&downloaded_path)?;
+        std::fs::remove_dir_all(&target_directory)?;
+
+        assert_eq!(downloaded_bytes, body.len() as u64);
+        assert_eq!(downloaded_contents, body);
 
         Ok(())
     }

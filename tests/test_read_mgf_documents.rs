@@ -274,6 +274,14 @@ fn test_mgf_iter_reads_records_one_by_one() -> Result<()> {
 }
 
 #[test]
+fn test_mgf_iter_is_fused_after_empty_input() {
+    let mut iter = MGFIter::<f64, _>::from_document("");
+
+    assert!(iter.next().is_none());
+    assert!(iter.next().is_none());
+}
+
+#[test]
 fn test_mgf_iter_reads_borrowed_str_without_std_reader() -> Result<()> {
     let document = concat!(
         "BEGIN IONS\n",
@@ -758,6 +766,33 @@ END IONS
     assert_eq!(read_zstd[0].precursor_mz().to_bits(), 500.0_f32.to_bits());
     assert_eq!(read_gzip.len(), 1);
     assert_eq!(read_gzip[0].feature_id(), Some("3"));
+
+    Ok(())
+}
+
+#[test]
+fn test_to_path_reports_create_file_errors() -> std::result::Result<(), Box<dyn std::error::Error>>
+{
+    let target_directory = std::env::temp_dir().join(format!(
+        "mascot-rs-write-path-error-test-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&target_directory);
+    std::fs::create_dir_all(&target_directory)?;
+    let document = r"BEGIN IONS
+FEATURE_ID=3
+PEPMASS=500.0
+CHARGE=1
+MSLEVEL=2
+100.0 2.0
+SCANS=3
+END IONS
+";
+    let mgf: MGFVec<f32> = document.parse()?;
+    let result = mgf.to_path(&target_directory);
+    std::fs::remove_dir_all(&target_directory)?;
+
+    assert!(matches!(result, Err(MascotError::Io { .. })));
 
     Ok(())
 }
@@ -1838,7 +1873,7 @@ fn test_gnps_builder_loads_existing_downloaded_file() -> Result<()> {
     })?;
     let expected_bytes = document.len() as u64;
 
-    let gnps_load = block_on_dataset(builder.load())?;
+    let gnps_load = block_on_dataset(Dataset::load(builder))?;
     let _ = std::fs::remove_dir_all(&target_directory);
 
     assert!(gnps_load.mem_size(SizeFlags::default()) >= std::mem::size_of_val(&gnps_load));

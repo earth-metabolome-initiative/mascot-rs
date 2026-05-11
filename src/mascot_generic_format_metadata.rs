@@ -204,7 +204,7 @@ impl FromStr for Instrument {
 pub struct MascotGenericFormatMetadata {
     feature_id: Option<String>,
     scans: Option<String>,
-    level: u8,
+    level: Option<u8>,
     retention_time: Option<f64>,
     charge: Option<i8>,
     filename: Option<String>,
@@ -278,7 +278,7 @@ impl MascotGenericFormatMetadata {
     ///
     /// # Arguments
     /// * `feature_id` - The feature ID of the metadata, if present.
-    /// * `level` - The MS fragmentation level.
+    /// * `level` - The MS fragmentation level, if reported.
     /// * `retention_time` - The retention time of the metadata, if present.
     /// * `charge` - The precursor charge of the metadata, if known.
     /// * `filename` - The filename of the metadata.
@@ -298,7 +298,7 @@ impl MascotGenericFormatMetadata {
     /// use mascot_rs::prelude::*;
     ///
     /// let feature_id = Some("1".to_string());
-    /// let level = 2;
+    /// let level = Some(2);
     /// let retention_time = Some(37.083);
     /// let charge = Some(1);
     /// let filename = Some("20220513_PMA_DBGI_01_04_003.mzML".to_string());
@@ -321,7 +321,7 @@ impl MascotGenericFormatMetadata {
     /// assert!(
     ///     MascotGenericFormatMetadata::new(
     ///         feature_id.clone(),
-    ///         0,
+    ///         Some(0),
     ///         retention_time,
     ///         charge,
     ///         filename.clone(),
@@ -351,7 +351,7 @@ impl MascotGenericFormatMetadata {
     /// ```
     pub fn new(
         feature_id: Option<String>,
-        level: u8,
+        level: impl Into<Option<u8>>,
         retention_time: Option<f64>,
         charge: Option<i8>,
         filename: Option<String>,
@@ -364,7 +364,7 @@ impl MascotGenericFormatMetadata {
     ///
     /// # Arguments
     /// * `feature_id` - The feature ID of the metadata, if present.
-    /// * `level` - The MS fragmentation level.
+    /// * `level` - The MS fragmentation level, if reported.
     /// * `retention_time` - The retention time of the metadata, if present.
     /// * `charge` - The precursor charge of the metadata, if known.
     /// * `filename` - The filename of the metadata.
@@ -394,7 +394,7 @@ impl MascotGenericFormatMetadata {
     /// ```
     pub fn new_with_smiles(
         feature_id: Option<String>,
-        level: u8,
+        level: impl Into<Option<u8>>,
         retention_time: Option<f64>,
         charge: Option<i8>,
         filename: Option<String>,
@@ -416,7 +416,7 @@ impl MascotGenericFormatMetadata {
     ///
     /// # Arguments
     /// * `feature_id` - The feature ID of the metadata, if present.
-    /// * `level` - The MS fragmentation level.
+    /// * `level` - The MS fragmentation level, if reported.
     /// * `retention_time` - The retention time of the metadata, if present.
     /// * `charge` - The precursor charge of the metadata, if known.
     /// * `filename` - The filename of the metadata.
@@ -448,18 +448,19 @@ impl MascotGenericFormatMetadata {
     /// ```
     pub fn new_with_smiles_and_ion_mode(
         feature_id: Option<String>,
-        level: u8,
+        level: impl Into<Option<u8>>,
         retention_time: Option<f64>,
         charge: Option<i8>,
         filename: Option<String>,
         smiles: Option<Smiles>,
         ion_mode: Option<IonMode>,
     ) -> Result<Self> {
+        let level = level.into();
         let charge = charge.filter(|charge| *charge != 0);
-        if level == 0 {
+        if level == Some(0) {
             return Err(MascotError::NonPositiveField {
                 field: "fragmentation level",
-                line: level.to_string(),
+                line: "0".to_string(),
             });
         }
 
@@ -686,9 +687,9 @@ impl MascotGenericFormatMetadata {
         self.scans.as_deref()
     }
 
-    /// Returns the MS fragmentation level.
+    /// Returns the MS fragmentation level, if reported.
     #[must_use]
-    pub const fn level(&self) -> u8 {
+    pub const fn level(&self) -> Option<u8> {
         self.level
     }
 

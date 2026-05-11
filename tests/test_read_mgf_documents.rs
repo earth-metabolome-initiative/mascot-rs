@@ -874,8 +874,8 @@ fn test_ms_level_is_u8_not_two_value_enum() -> Result<()> {
 
     let mgf: MGFVec = MGFVec::try_from_iter(lines)?;
 
-    assert_eq!(mgf[0].level(), 3);
-    assert_eq!(mgf[0].metadata().level(), 3);
+    assert_eq!(mgf[0].level(), Some(3));
+    assert_eq!(mgf[0].metadata().level(), Some(3));
 
     Ok(())
 }
@@ -909,9 +909,33 @@ fn test_duplicate_feature_ids_are_distinct_ion_blocks() -> Result<()> {
     assert_eq!(mgf.len(), 2);
     assert_eq!(records.len(), 2);
     assert_eq!(mgf[0].feature_id(), Some("1"));
-    assert_eq!(mgf[0].level(), 1);
+    assert_eq!(mgf[0].level(), Some(1));
     assert_eq!(mgf[1].feature_id(), Some("1"));
-    assert_eq!(mgf[1].level(), 2);
+    assert_eq!(mgf[1].level(), Some(2));
+
+    Ok(())
+}
+
+#[test]
+fn test_records_without_ms_level_are_accepted() -> Result<()> {
+    let document = concat!(
+        "BEGIN IONS\n",
+        "FEATURE_ID=missing-level\n",
+        "PEPMASS=500.0\n",
+        "CHARGE=1\n",
+        "RTINSECONDS=10.0\n",
+        "100.0 2.0\n",
+        "SCANS=1\n",
+        "END IONS\n",
+    );
+
+    let mgf: MGFVec = document.parse()?;
+    let record: MascotGenericFormat = document.parse()?;
+
+    assert_eq!(mgf.len(), 1);
+    assert_eq!(mgf[0].level(), None);
+    assert_eq!(mgf[0].metadata().level(), None);
+    assert_eq!(record.level(), None);
 
     Ok(())
 }
@@ -1368,7 +1392,7 @@ fn test_metadata_routes_known_header_keys_to_structured_fields() -> Result<()> {
     assert!(metadata.insert_arbitrary_metadata("ADDUCT", "[M+H]+")?);
 
     assert_eq!(metadata.splash(), Some(VALID_SPLASH));
-    assert_eq!(metadata.level(), 2);
+    assert_eq!(metadata.level(), Some(2));
     assert_eq!(metadata.ion_mode(), Some(IonMode::Positive));
     assert_eq!(metadata.source_instrument(), Some(Instrument::Quadrupole));
     assert!(metadata.formula().is_some());
@@ -1590,7 +1614,7 @@ fn test_mgf_record_implements_allocable_spectrum_traits() -> Result<()> {
 
     let mut allocated = MascotGenericFormat::<f32>::with_capacity(500.0, 2)?;
     assert_allocable(&allocated);
-    assert_eq!(allocated.level(), 2);
+    assert_eq!(allocated.level(), Some(2));
     assert_eq!(allocated.charge(), None);
     assert!(allocated.feature_id().is_none());
     assert!(allocated.is_empty());
@@ -1729,7 +1753,7 @@ fn test_gnps_library_records_parse_annotation_metadata() -> Result<()> {
         mgf[0].metadata().arbitrary_metadata_value("SPECTRUMID"),
         Some("CCMSLIB00000072100")
     );
-    assert_eq!(mgf[0].level(), 2);
+    assert_eq!(mgf[0].level(), Some(2));
     assert_eq!(mgf[0].len(), 3);
 
     Ok(())
@@ -2278,7 +2302,7 @@ END IONS
     assert_eq!(load.path(), path.as_path());
     assert_eq!(load.bytes(), expected_bytes);
     assert_eq!(load.spectra()[0].feature_id(), Some("MassSpecGymID0000001"));
-    assert_eq!(load.spectra()[0].level(), 2);
+    assert_eq!(load.spectra()[0].level(), Some(2));
     assert_eq!(load.spectra()[0].charge(), Some(1));
     assert_eq!(load.spectra()[0].ion_mode(), Some(IonMode::Positive));
     assert_eq!(
@@ -2346,7 +2370,7 @@ END IONS
         field: "first_record",
     })?;
     assert_eq!(first.feature_id(), Some("MassSpecGymID0000001"));
-    assert_eq!(first.level(), 2);
+    assert_eq!(first.level(), Some(2));
     assert_eq!(first.charge(), Some(1));
     assert_eq!(first.ion_mode(), Some(IonMode::Positive));
     assert_eq!(first.source_instrument(), Some(Instrument::Orbitrap));

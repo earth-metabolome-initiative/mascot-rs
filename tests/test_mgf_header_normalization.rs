@@ -94,7 +94,7 @@ END IONS";
 fn assert_mona_style_spectrum(spectra: &MGFVec) {
     assert_eq!(spectra.len(), 1);
     assert_eq!(spectra[0].charge(), Some(1));
-    assert_eq!(spectra[0].level(), 2);
+    assert_eq!(spectra[0].level(), Some(2));
     assert_eq!(spectra[0].precursor_mz().to_bits(), 360.0_f64.to_bits());
     assert_eq!(spectra[0].ion_mode(), Some(IonMode::Positive));
     assert_eq!(spectra[0].source_instrument(), Some(Instrument::Quadrupole));
@@ -163,7 +163,7 @@ END IONS
 
     assert_eq!(spectra.len(), 1);
     assert_eq!(spectra[0].charge(), Some(1));
-    assert_eq!(spectra[0].level(), 2);
+    assert_eq!(spectra[0].level(), Some(2));
     assert_eq!(
         spectra[0].precursor_mz().to_bits(),
         360.000_030_517_578_1_f64.to_bits()

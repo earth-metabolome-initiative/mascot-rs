@@ -164,7 +164,9 @@ impl<P: SpectrumFloat> MascotGenericFormat<P> {
 
         let stored_precursor_mz = spectrum.precursor_mz().to_f64();
         let first_level_min_mz = spectrum.mz_nth(0).to_f64();
-        if metadata.level() == 1 && stored_precursor_mz.to_bits() != first_level_min_mz.to_bits() {
+        if metadata.level() == Some(1)
+            && stored_precursor_mz.to_bits() != first_level_min_mz.to_bits()
+        {
             return Err(MascotError::FirstLevelPrecursorMzMismatch {
                 precursor_mz: stored_precursor_mz,
                 first_level_min_mz,
@@ -209,8 +211,8 @@ impl<P: SpectrumFloat> MascotGenericFormat<P> {
         self.metadata.scans()
     }
 
-    /// Returns the MS fragmentation level.
-    pub const fn level(&self) -> u8 {
+    /// Returns the MS fragmentation level, if reported.
+    pub const fn level(&self) -> Option<u8> {
         self.metadata.level()
     }
 
@@ -297,7 +299,9 @@ impl<P: SpectrumFloat> MascotGenericFormat<P> {
         if let Some(retention_time) = self.metadata.retention_time() {
             Self::map_output_io(writeln!(writer, "RTINSECONDS={retention_time}"))?;
         }
-        Self::map_output_io(writeln!(writer, "MSLEVEL={}", self.metadata.level()))?;
+        if let Some(level) = self.metadata.level() {
+            Self::map_output_io(writeln!(writer, "MSLEVEL={level}"))?;
+        }
         if let Some(filename) = self.metadata.filename() {
             Self::map_output_io(writeln!(writer, "FILENAME={filename}"))?;
         }
@@ -448,7 +452,7 @@ impl<P: SpectrumFloat> SpectrumMut for MascotGenericFormat<P> {
 impl<P: SpectrumFloat> SpectrumAlloc for MascotGenericFormat<P> {
     fn with_capacity(precursor_mz: f64, capacity: usize) -> Result<Self> {
         Ok(Self {
-            metadata: MascotGenericFormatMetadata::new(None, 2, None, None, None)?,
+            metadata: MascotGenericFormatMetadata::new(None, Some(2), None, None, None)?,
             spectrum: GenericSpectrum::<P>::try_with_capacity(precursor_mz, capacity)?,
         })
     }
@@ -1344,7 +1348,7 @@ mod tests {
         let record = MascotGenericFormat::<f64>::with_capacity(250.0, 4)?;
 
         assert_eq!(record.len(), 0);
-        assert_eq!(record.level(), 2);
+        assert_eq!(record.level(), Some(2));
         assert_eq!(record.precursor_mz().to_bits(), 250.0_f64.to_bits());
 
         Ok(())

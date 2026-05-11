@@ -190,10 +190,7 @@ impl<P: SpectrumFloat> MascotGenericFormatMetadataBuilder<P> {
     fn into_metadata(self) -> Result<MascotGenericFormatMetadata> {
         Ok(MascotGenericFormatMetadata::new_with_smiles_and_ion_mode(
             self.feature_id,
-            self.level.ok_or(MascotError::MissingField {
-                builder: "MascotGenericFormatMetadata",
-                field: "level",
-            })?,
+            self.level,
             self.retention_time,
             self.charge,
             self.filename,
@@ -211,7 +208,7 @@ impl<P: SpectrumFloat> MascotGenericFormatMetadataBuilder<P> {
         Self {
             feature_id: metadata.feature_id().map(ToString::to_string),
             scans: metadata.scans().map(ToString::to_string),
-            level: Some(metadata.level()),
+            level: metadata.level(),
             precursor_mz: None,
             precursor_mz_source: None,
             precursor_mz_precision: None,
@@ -1049,7 +1046,7 @@ mod tests {
 
         assert_eq!(mascot_generic_format_metadata.feature_id(), Some("1"));
         assert_eq!(mascot_generic_format_metadata.scans(), Some("1"));
-        assert_eq!(mascot_generic_format_metadata.level(), 2);
+        assert_eq!(mascot_generic_format_metadata.level(), Some(2));
         assert_eq!(precursor_mz.to_bits(), 381.0795_f64.to_bits());
         assert_eq!(
             mascot_generic_format_metadata
@@ -1294,7 +1291,7 @@ mod tests {
 
         assert_eq!(mascot_generic_format_metadata.feature_id(), None);
         assert_eq!(mascot_generic_format_metadata.scans(), None);
-        assert_eq!(mascot_generic_format_metadata.level(), 2);
+        assert_eq!(mascot_generic_format_metadata.level(), Some(2));
         assert_eq!(precursor_mz.to_bits(), 381.0795_f64.to_bits());
         assert_eq!(mascot_generic_format_metadata.charge(), Some(1));
         Ok(())
@@ -1309,9 +1306,24 @@ mod tests {
 
         let (mascot_generic_format_metadata, precursor_mz) = parser.build()?;
 
-        assert_eq!(mascot_generic_format_metadata.level(), 2);
+        assert_eq!(mascot_generic_format_metadata.level(), Some(2));
         assert_eq!(precursor_mz.to_bits(), 381.0795_f64.to_bits());
         assert_eq!(mascot_generic_format_metadata.charge(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn builds_metadata_without_level() -> Result<()> {
+        let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();
+
+        parser.digest_line("PEPMASS=381.0795")?;
+        parser.digest_line("CHARGE=1")?;
+
+        let (mascot_generic_format_metadata, precursor_mz) = parser.build()?;
+
+        assert_eq!(mascot_generic_format_metadata.level(), None);
+        assert_eq!(precursor_mz.to_bits(), 381.0795_f64.to_bits());
+        assert_eq!(mascot_generic_format_metadata.charge(), Some(1));
         Ok(())
     }
 
@@ -1731,7 +1743,10 @@ mod tests {
         let parser = MascotGenericFormatMetadataBuilder::<f64>::default();
         assert!(matches!(
             parser.build(),
-            Err(MascotError::MissingField { field: "level", .. })
+            Err(MascotError::MissingField {
+                field: "precursor_mz",
+                ..
+            })
         ));
 
         let mut parser = MascotGenericFormatMetadataBuilder::<f64>::default();

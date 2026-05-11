@@ -75,13 +75,11 @@ let mut positive_orbitrap: MGFVec = spectra
     .filter(|record| record.ion_mode() == Some(IonMode::Positive))
     .filter(|record| record.source_instrument() == Some(Instrument::Orbitrap))
     .collect();
-positive_orbitrap
-    .iter_mut()
-    .for_each(|record| {
-        let _ = record
-            .metadata_mut()
-            .insert_arbitrary_metadata("EXPORT_BATCH", "curated");
-    });
+for record in &mut positive_orbitrap {
+    record
+        .metadata_mut()
+        .insert_arbitrary_metadata("EXPORT_BATCH", "curated")?;
+}
 let total_peaks = positive_orbitrap
     .spectra()
     .map(Spectrum::len)

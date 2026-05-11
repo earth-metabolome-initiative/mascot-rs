@@ -7,6 +7,7 @@ use core::{fmt, str::FromStr};
 
 use molecular_formulas::prelude::ChemicalFormula;
 
+use crate::mascot_generic_format_metadata_builder::MascotGenericFormatMetadataBuilder;
 use crate::numeric;
 use crate::prelude::*;
 
@@ -515,6 +516,15 @@ impl MascotGenericFormatMetadata {
         self
     }
 
+    #[must_use]
+    pub(crate) fn with_raw_arbitrary_metadata(
+        mut self,
+        arbitrary_metadata: Vec<(String, String)>,
+    ) -> Self {
+        self.arbitrary_metadata = sorted_arbitrary_metadata(arbitrary_metadata);
+        self
+    }
+
     /// Returns this metadata with normalized instrument metadata set.
     ///
     /// # Examples
@@ -579,7 +589,9 @@ impl MascotGenericFormatMetadata {
 
     /// Returns this metadata with arbitrary MGF header metadata set.
     ///
-    /// The entries are stored sorted by key. Repeated keys keep the last value.
+    /// Known structured header keys are routed to structured metadata fields.
+    /// Unknown entries are stored sorted by key. Repeated unknown keys keep the
+    /// last value.
     ///
     /// # Examples
     ///
@@ -597,22 +609,32 @@ impl MascotGenericFormatMetadata {
     ///     .with_arbitrary_metadata(vec![
     ///         ("NAME".to_string(), "Ethanol".to_string()),
     ///         ("SPECTRUMID".to_string(), "CCMSLIB00000000001".to_string()),
-    ///     ]);
+    ///     ]).unwrap();
     ///
     /// assert_eq!(
     ///     metadata.arbitrary_metadata_value("NAME"),
     ///     Some("Ethanol")
     /// );
     /// ```
-    #[must_use]
-    pub fn with_arbitrary_metadata(mut self, arbitrary_metadata: Vec<(String, String)>) -> Self {
-        self.arbitrary_metadata = sorted_arbitrary_metadata(arbitrary_metadata);
-        self
+    /// # Errors
+    /// Returns an error when a known structured key cannot be parsed, conflicts
+    /// with existing structured metadata, or belongs to the owning MGF record
+    /// instead of metadata alone.
+    pub fn with_arbitrary_metadata(
+        mut self,
+        arbitrary_metadata: Vec<(String, String)>,
+    ) -> Result<Self> {
+        self.arbitrary_metadata.clear();
+        for (key, value) in arbitrary_metadata {
+            self.insert_arbitrary_metadata(key, value)?;
+        }
+        Ok(self)
     }
 
-    /// Inserts or replaces one arbitrary MGF header metadata entry.
+    /// Inserts or replaces one MGF header metadata entry.
     ///
-    /// The entries are kept sorted by key.
+    /// Known structured header keys are routed to structured metadata fields.
+    /// Unknown entries are kept sorted by key.
     ///
     /// # Examples
     ///
@@ -628,25 +650,28 @@ impl MascotGenericFormatMetadata {
     ///         None,
     ///     ).unwrap();
     ///
-    /// assert_eq!(
-    ///     metadata.insert_arbitrary_metadata("NAME", "Ethanol"),
-    ///     None
-    /// );
-    /// assert_eq!(
-    ///     metadata.insert_arbitrary_metadata("NAME", "Updated ethanol"),
-    ///     Some("Ethanol".to_string())
-    /// );
+    /// assert!(metadata.insert_arbitrary_metadata("NAME", "Ethanol").unwrap());
+    /// assert!(metadata.insert_arbitrary_metadata("NAME", "Updated ethanol").unwrap());
     /// assert_eq!(
     ///     metadata.arbitrary_metadata_value("NAME"),
     ///     Some("Updated ethanol")
     /// );
     /// ```
+    /// # Errors
+    /// Returns an error when a known structured key cannot be parsed, conflicts
+    /// with existing structured metadata, or belongs to the owning MGF record
+    /// instead of metadata alone.
     pub fn insert_arbitrary_metadata(
         &mut self,
         key: impl Into<String>,
         value: impl Into<String>,
-    ) -> Option<String> {
-        insert_sorted_arbitrary_metadata(&mut self.arbitrary_metadata, key.into(), value.into())
+    ) -> Result<bool> {
+        let key = key.into();
+        let value = value.into();
+        let mut builder = MascotGenericFormatMetadataBuilder::<f64>::from_metadata(self);
+        let stored_as_arbitrary = builder.digest_metadata_pair(&key, &value)?;
+        *self = builder.build_metadata()?;
+        Ok(stored_as_arbitrary)
     }
 
     /// Returns the feature ID of the metadata, if present.
@@ -703,6 +728,10 @@ impl MascotGenericFormatMetadata {
     #[cfg(feature = "std")]
     pub(crate) fn formula_original(&self) -> Option<&str> {
         self.formula.as_ref().map(FormulaMetadata::original)
+    }
+
+    pub(crate) const fn formula_metadata(&self) -> Option<&FormulaMetadata> {
+        self.formula.as_ref()
     }
 
     /// Returns the `SPLASH` metadata value, if present.
@@ -779,3 +808,15 @@ impl mem_dbg::MemSize for FormulaMetadata {
 
 #[cfg(feature = "mem_dbg")]
 impl mem_dbg::MemDbgImpl for FormulaMetadata {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_instrument_from_str() -> Result<()> {
+        assert_eq!("LC-ESI-QQ".parse::<Instrument>()?, Instrument::Quadrupole);
+        assert_eq!("unknown".parse::<Instrument>()?, Instrument::Other);
+        Ok(())
+    }
+}

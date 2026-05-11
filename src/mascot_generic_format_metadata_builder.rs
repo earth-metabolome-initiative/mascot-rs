@@ -5,7 +5,9 @@ use alloc::{
 
 use molecular_formulas::prelude::{ChemicalFormula, MolecularFormula};
 
-use crate::mascot_generic_format_metadata::{insert_sorted_arbitrary_metadata, FormulaMetadata};
+use crate::mascot_generic_format_metadata::{
+    insert_sorted_arbitrary_metadata, FormulaMetadata, MascotGenericFormatMetadata,
+};
 use crate::numeric;
 use crate::prelude::*;
 
@@ -185,16 +187,8 @@ impl<P: SpectrumFloat> MascotGenericFormatMetadataBuilder<P> {
         Ok(())
     }
 
-    /// Builds parsed MGF metadata and the precursor m/z.
-    ///
-    /// # Errors
-    /// Returns an error if required fields are missing or merged-scan metadata
-    /// is invalid.
-    pub(super) fn build(self) -> Result<(MascotGenericFormatMetadata, P)> {
-        self.validate_merged_scan_metadata()?;
-        self.validate_formula_matches_smiles()?;
-
-        let metadata = MascotGenericFormatMetadata::new_with_smiles_and_ion_mode(
+    fn into_metadata(self) -> Result<MascotGenericFormatMetadata> {
+        Ok(MascotGenericFormatMetadata::new_with_smiles_and_ion_mode(
             self.feature_id,
             self.level.ok_or(MascotError::MissingField {
                 builder: "MascotGenericFormatMetadata",
@@ -210,8 +204,51 @@ impl<P: SpectrumFloat> MascotGenericFormatMetadataBuilder<P> {
         .with_formula_metadata(self.formula)
         .with_splash(self.splash)
         .with_source_instrument(self.source_instrument)
-        .with_arbitrary_metadata(self.arbitrary_metadata);
-        let precursor_mz = self.precursor_mz.ok_or(MascotError::MissingField {
+        .with_raw_arbitrary_metadata(self.arbitrary_metadata))
+    }
+
+    pub(crate) fn from_metadata(metadata: &MascotGenericFormatMetadata) -> Self {
+        Self {
+            feature_id: metadata.feature_id().map(ToString::to_string),
+            scans: metadata.scans().map(ToString::to_string),
+            level: Some(metadata.level()),
+            precursor_mz: None,
+            precursor_mz_source: None,
+            precursor_mz_precision: None,
+            retention_time: metadata.retention_time(),
+            charge: metadata.charge(),
+            merged_scan_count: None,
+            retained_merged_scan_count: None,
+            merged_scans_removed_due_to_low_quality: None,
+            merged_scans_removed_due_to_low_cosine: None,
+            merged_total_scan_count: None,
+            filename: metadata.filename().map(ToString::to_string),
+            smiles: metadata.smiles().cloned(),
+            formula: metadata.formula_metadata().cloned(),
+            splash: metadata.splash().map(ToString::to_string),
+            ion_mode: metadata.ion_mode(),
+            source_instrument: metadata.source_instrument(),
+            arbitrary_metadata: metadata.arbitrary_metadata().to_vec(),
+        }
+    }
+
+    pub(crate) fn build_metadata(self) -> Result<MascotGenericFormatMetadata> {
+        self.validate_merged_scan_metadata()?;
+        self.validate_formula_matches_smiles()?;
+        self.into_metadata()
+    }
+
+    /// Builds parsed MGF metadata and the precursor m/z.
+    ///
+    /// # Errors
+    /// Returns an error if required fields are missing or merged-scan metadata
+    /// is invalid.
+    pub(super) fn build(self) -> Result<(MascotGenericFormatMetadata, P)> {
+        self.validate_merged_scan_metadata()?;
+        self.validate_formula_matches_smiles()?;
+        let precursor_mz = self.precursor_mz;
+        let metadata = self.into_metadata()?;
+        let precursor_mz = precursor_mz.ok_or(MascotError::MissingField {
             builder: "MascotGenericFormat",
             field: "precursor_mz",
         })?;
@@ -885,6 +922,24 @@ impl<P: SpectrumFloat> MascotGenericFormatMetadataBuilder<P> {
     /// Returns whether the line can be stored as arbitrary metadata.
     pub(super) fn can_parse_arbitrary_metadata_line(line: &str) -> bool {
         line.contains('=')
+    }
+
+    pub(crate) fn digest_metadata_pair(&mut self, key: &str, value: &str) -> Result<bool> {
+        let line = alloc::format!("{key}={value}");
+        match Self::classify_line(&line) {
+            Some(MGFMetadataLine::PrecursorMz(..)) => Err(MascotError::RecordFieldNotMetadata {
+                field: "precursor_mz",
+                line,
+            }),
+            Some(_) => {
+                self.digest_line(&line)?;
+                Ok(false)
+            }
+            None => {
+                self.digest_arbitrary_metadata_line(&line)?;
+                Ok(true)
+            }
+        }
     }
 
     /// Parses a line to a [`MascotGenericFormatMetadataBuilder`].

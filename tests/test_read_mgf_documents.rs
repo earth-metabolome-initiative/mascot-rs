@@ -948,15 +948,16 @@ fn test_mgf_vec_iteration_helpers_are_standard_collection_interfaces() -> Result
         .into_iter()
         .map(|record| record.feature_id().map(ToString::to_string))
         .collect::<Vec<_>>();
-    mgf.iter_mut().for_each(|record| {
+    let mutable_records = mgf.iter_mut();
+    for record in mutable_records {
         record
             .metadata_mut()
-            .insert_arbitrary_metadata("ITER_MUT", "yes");
-    });
+            .insert_arbitrary_metadata("ITER_MUT", "yes")?;
+    }
     for record in &mut mgf {
         record
             .metadata_mut()
-            .insert_arbitrary_metadata("BORROWED_MUT", "yes");
+            .insert_arbitrary_metadata("BORROWED_MUT", "yes")?;
     }
     assert!(mgf.iter().all(|record| {
         record.metadata().arbitrary_metadata_value("ITER_MUT") == Some("yes")
@@ -1298,13 +1299,13 @@ fn test_metadata_inserts_arbitrary_metadata() -> Result<()> {
     let mut metadata =
         MascotGenericFormatMetadata::new(Some("1".to_string()), 2, None, Some(1), None)?;
 
-    let first_previous_value = metadata.insert_arbitrary_metadata("SPECTRUMID", "old-id");
-    let name_previous_value = metadata.insert_arbitrary_metadata("NAME", "Example");
-    let second_previous_value = metadata.insert_arbitrary_metadata("SPECTRUMID", "new-id");
+    let first_inserted = metadata.insert_arbitrary_metadata("SPECTRUMID", "old-id")?;
+    let name_inserted = metadata.insert_arbitrary_metadata("NAME", "Example")?;
+    let second_inserted = metadata.insert_arbitrary_metadata("SPECTRUMID", "new-id")?;
 
-    assert_eq!(first_previous_value, None);
-    assert_eq!(name_previous_value, None);
-    assert_eq!(second_previous_value.as_deref(), Some("old-id"));
+    assert!(first_inserted);
+    assert!(name_inserted);
+    assert!(second_inserted);
     assert_eq!(
         metadata.arbitrary_metadata(),
         &[
@@ -1312,6 +1313,122 @@ fn test_metadata_inserts_arbitrary_metadata() -> Result<()> {
             ("SPECTRUMID".to_string(), "new-id".to_string()),
         ]
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_metadata_routes_known_header_keys_to_structured_fields() -> Result<()> {
+    const VALID_SPLASH: &str = "splash10-0udi-0490000000-4425acda10ed7d4709bd";
+    let mut metadata =
+        MascotGenericFormatMetadata::new(Some("1".to_string()), 2, None, Some(1), None)?;
+
+    assert!(!metadata.insert_arbitrary_metadata("SPLASH", VALID_SPLASH)?);
+    assert!(!metadata.insert_arbitrary_metadata("MS_LEVEL", "MS2")?);
+    assert!(!metadata.insert_arbitrary_metadata("ION_MODE", "positive")?);
+    assert!(!metadata.insert_arbitrary_metadata("INSTRUMENT_TYPE", "LC-ESI-QQ")?);
+    assert!(!metadata.insert_arbitrary_metadata("FORMULA", "C2H6O")?);
+    assert!(!metadata.insert_arbitrary_metadata("SMILES", "CCO")?);
+    assert!(!metadata.insert_arbitrary_metadata("CHARGE", "1+")?);
+    assert!(metadata.insert_arbitrary_metadata("ADDUCT", "[M+H]+")?);
+
+    assert_eq!(metadata.splash(), Some(VALID_SPLASH));
+    assert_eq!(metadata.level(), 2);
+    assert_eq!(metadata.ion_mode(), Some(IonMode::Positive));
+    assert_eq!(metadata.source_instrument(), Some(Instrument::Quadrupole));
+    assert!(metadata.formula().is_some());
+    assert!(metadata.smiles().is_some());
+    assert_eq!(metadata.charge(), Some(1));
+    assert_eq!(metadata.arbitrary_metadata_value("ADDUCT"), Some("[M+H]+"));
+    assert_eq!(metadata.arbitrary_metadata_value("SPLASH"), None);
+    assert_eq!(metadata.arbitrary_metadata_value("MS_LEVEL"), None);
+    assert_eq!(metadata.arbitrary_metadata_value("ION_MODE"), None);
+    assert_eq!(metadata.arbitrary_metadata_value("INSTRUMENT_TYPE"), None);
+    assert_eq!(metadata.arbitrary_metadata_value("FORMULA"), None);
+    assert_eq!(metadata.arbitrary_metadata_value("SMILES"), None);
+    assert_eq!(metadata.arbitrary_metadata_value("CHARGE"), None);
+
+    Ok(())
+}
+
+#[test]
+fn test_metadata_header_insertion_rejects_conflicts_and_record_fields() -> Result<()> {
+    let mut metadata =
+        MascotGenericFormatMetadata::new(Some("1".to_string()), 2, None, Some(1), None)?;
+
+    assert!(!metadata.insert_arbitrary_metadata("CHARGE", "1+")?);
+    assert!(matches!(
+        metadata.insert_arbitrary_metadata("CHARGE", "2+"),
+        Err(MascotError::ConflictingField {
+            field: "charge",
+            ..
+        })
+    ));
+    assert!(matches!(
+        metadata.insert_arbitrary_metadata("PEPMASS", "250.0"),
+        Err(MascotError::RecordFieldNotMetadata {
+            field: "precursor_mz",
+            ..
+        })
+    ));
+
+    Ok(())
+}
+
+#[test]
+fn test_with_arbitrary_metadata_routes_known_header_keys() -> Result<()> {
+    let metadata = MascotGenericFormatMetadata::new(None, 2, None, Some(1), None)?
+        .with_arbitrary_metadata(vec![
+            ("NAME".to_string(), "Ethanol".to_string()),
+            ("SPLASH".to_string(), "splash10-test".to_string()),
+            ("IONMODE".to_string(), "positive".to_string()),
+        ])?;
+
+    assert_eq!(metadata.splash(), Some("splash10-test"));
+    assert_eq!(metadata.ion_mode(), Some(IonMode::Positive));
+    assert_eq!(metadata.arbitrary_metadata_value("NAME"), Some("Ethanol"));
+    assert_eq!(metadata.arbitrary_metadata_value("SPLASH"), None);
+    assert_eq!(metadata.arbitrary_metadata_value("IONMODE"), None);
+
+    Ok(())
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn test_serialization_does_not_duplicate_routed_structured_metadata(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    const VALID_SPLASH: &str = "splash10-0udi-0490000000-4425acda10ed7d4709bd";
+    let document = concat!(
+        "BEGIN IONS\n",
+        "PEPMASS=250.0\n",
+        "CHARGE=1\n",
+        "MSLEVEL=2\n",
+        "SMILES=CCO\n",
+        "FORMULA=C2H6O\n",
+        "100.0 10.0\n",
+        "200.0 20.0\n",
+        "END IONS\n",
+    );
+    let mut record: MascotGenericFormat = document.parse()?;
+
+    assert!(!record
+        .metadata_mut()
+        .insert_arbitrary_metadata("SPLASH", VALID_SPLASH)?);
+    assert!(!record
+        .metadata_mut()
+        .insert_arbitrary_metadata("ION_MODE", "positive")?);
+    assert!(record
+        .metadata_mut()
+        .insert_arbitrary_metadata("EXPORT_BATCH", "curated")?);
+
+    let mut output = Vec::new();
+    record.write_to(&mut output)?;
+    let serialized = std::str::from_utf8(&output)?;
+
+    assert_eq!(serialized.matches("SPLASH=").count(), 1);
+    assert_eq!(serialized.matches("IONMODE=").count(), 1);
+    assert_eq!(serialized.matches("ION_MODE=").count(), 0);
+    assert_eq!(serialized.matches("EXPORT_BATCH=").count(), 1);
 
     Ok(())
 }

@@ -221,6 +221,16 @@ pub enum MascotError {
         /// Original input line.
         line: String,
     },
+    /// A structured MGF record field was inserted through metadata alone.
+    #[error(
+        "{field} belongs to the owning MGF record and cannot be inserted through MascotGenericFormatMetadata from line \"{line}\""
+    )]
+    RecordFieldNotMetadata {
+        /// Field name.
+        field: &'static str,
+        /// Original input line.
+        line: String,
+    },
     /// A line appeared before the parser was in a state that can accept it.
     #[error("line \"{line}\" appeared outside an open MGF ion section")]
     LineOutsideIonSection {

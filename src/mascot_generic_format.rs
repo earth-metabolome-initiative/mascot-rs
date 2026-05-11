@@ -135,6 +135,33 @@ impl<P: SpectrumFloat> MascotGenericFormat<P> {
         metadata: MascotGenericFormatMetadata,
         spectrum: GenericSpectrum<P>,
     ) -> Result<Self> {
+        Self::validate_spectrum_metadata_shape(&metadata, &spectrum)?;
+
+        let record = Self { metadata, spectrum };
+        record.validate_splash_metadata()?;
+        Ok(record)
+    }
+
+    fn from_edited_spectrum(
+        metadata: MascotGenericFormatMetadata,
+        spectrum: GenericSpectrum<P>,
+    ) -> Result<Self> {
+        Self::validate_spectrum_metadata_shape(&metadata, &spectrum)?;
+
+        let mut record = Self { metadata, spectrum };
+        record.refresh_derived_metadata_after_peak_edit()?;
+        record.validate_splash_metadata()?;
+        Ok(record)
+    }
+
+    fn validate_spectrum_metadata_shape(
+        metadata: &MascotGenericFormatMetadata,
+        spectrum: &GenericSpectrum<P>,
+    ) -> Result<()> {
+        if spectrum.len() == 0 {
+            return Err(MascotError::EmptyPeakVectors);
+        }
+
         let stored_precursor_mz = spectrum.precursor_mz().to_f64();
         let first_level_min_mz = spectrum.mz_nth(0).to_f64();
         if metadata.level() == 1 && stored_precursor_mz.to_bits() != first_level_min_mz.to_bits() {
@@ -144,9 +171,7 @@ impl<P: SpectrumFloat> MascotGenericFormat<P> {
             });
         }
 
-        let record = Self { metadata, spectrum };
-        record.validate_splash_metadata()?;
-        Ok(record)
+        Ok(())
     }
 
     fn validate_splash_metadata(&self) -> Result<()> {
@@ -158,6 +183,15 @@ impl<P: SpectrumFloat> MascotGenericFormat<P> {
                     expected,
                 });
             }
+        }
+
+        Ok(())
+    }
+
+    fn refresh_derived_metadata_after_peak_edit(&mut self) -> Result<()> {
+        if self.metadata.splash().is_some() {
+            let splash = SpectrumSplash::splash(self)?;
+            self.metadata = self.metadata.clone().with_splash(Some(splash));
         }
 
         Ok(())
@@ -389,18 +423,24 @@ impl<P: SpectrumFloat> SpectrumMut for MascotGenericFormat<P> {
     type MutationError = MascotError;
 
     fn add_peak(&mut self, mz: P, intensity: P) -> Result<&mut Self> {
-        if self.metadata.splash().is_some() {
-            let mut spectrum = self.spectrum.clone();
+        let mut spectrum = self.spectrum.clone();
+        spectrum.add_peak(mz, intensity)?;
+        let candidate = Self::from_edited_spectrum(self.metadata.clone(), spectrum)?;
+        *self = candidate;
+        Ok(self)
+    }
+
+    fn add_peaks<I>(&mut self, peaks: I) -> Result<&mut Self>
+    where
+        I: IntoIterator<Item = (P, P)>,
+    {
+        let mut spectrum = self.spectrum.clone();
+        for (mz, intensity) in peaks {
             spectrum.add_peak(mz, intensity)?;
-            let candidate = Self {
-                metadata: self.metadata.clone(),
-                spectrum,
-            };
-            candidate.validate_splash_metadata()?;
-            self.spectrum = candidate.spectrum;
-        } else {
-            self.spectrum.add_peak(mz, intensity)?;
         }
+
+        let candidate = Self::from_edited_spectrum(self.metadata.clone(), spectrum)?;
+        *self = candidate;
         Ok(self)
     }
 }
@@ -414,7 +454,13 @@ impl<P: SpectrumFloat> SpectrumAlloc for MascotGenericFormat<P> {
     }
 
     fn top_k_peaks(&self, k: usize) -> Result<Self> {
-        Self::from_spectrum(
+        if k == 0 {
+            return Err(MascotError::EmptyPeakEdit {
+                operation: "top_k_peaks",
+            });
+        }
+
+        Self::from_edited_spectrum(
             self.metadata.clone(),
             <GenericSpectrum<P> as SpectrumAlloc>::top_k_peaks(&self.spectrum, k)?,
         )

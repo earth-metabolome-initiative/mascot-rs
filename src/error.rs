@@ -273,6 +273,12 @@ pub enum MascotError {
     /// A peak vector is empty.
     #[error("the MGF record contains no usable peaks after parsing and zero-intensity filtering")]
     EmptyPeakVectors,
+    /// A peak editing operation would produce an empty MGF record.
+    #[error("{operation} would leave the MGF record with no peaks")]
+    EmptyPeakEdit {
+        /// Peak editing operation.
+        operation: &'static str,
+    },
     /// A single-record parser received zero or multiple records.
     #[error("expected exactly one MGF record, found {found}")]
     SingleRecordExpected {

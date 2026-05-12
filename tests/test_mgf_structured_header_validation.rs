@@ -267,6 +267,64 @@ fn top_k_peaks_without_splash_does_not_add_splash() -> std::result::Result<(), S
 }
 
 #[test]
+fn intensity_normalized_recomputes_structured_splash() -> std::result::Result<(), String> {
+    let record = valid_splash_record()?;
+
+    let normalized = record.intensity_normalized().map_err(|error| {
+        format!(
+            "intensity_normalized should not fail solely because SPLASH metadata was present: {error}"
+        )
+    })?;
+
+    assert_eq!(normalized.len(), record.len());
+    let max_intensity = normalized
+        .intensities()
+        .map(SpectrumFloat::to_f64)
+        .fold(0.0_f64, f64::max);
+    if (max_intensity - 1.0).abs() > f64::EPSILON {
+        return Err(format!(
+            "intensity_normalized should rescale to a base peak of 1.0, found {max_intensity}"
+        ));
+    }
+    assert_current_structured_splash(&normalized)?;
+
+    Ok(())
+}
+
+#[test]
+fn intensity_normalized_without_splash_does_not_add_splash() -> std::result::Result<(), String> {
+    let record: MascotGenericFormat = valid_document_without_splash()
+        .parse()
+        .map_err(|error| format!("test fixture should parse without SPLASH: {error}"))?;
+
+    let normalized = record.intensity_normalized().map_err(|error| {
+        format!("intensity_normalized should work without SPLASH metadata: {error}")
+    })?;
+
+    assert_eq!(normalized.len(), record.len());
+    assert_eq!(normalized.metadata().splash(), None);
+
+    Ok(())
+}
+
+#[test]
+fn intensity_normalized_is_idempotent_for_splash() -> std::result::Result<(), String> {
+    let record = valid_splash_record()?;
+
+    let once = record
+        .intensity_normalized()
+        .map_err(|error| format!("first intensity_normalized should succeed: {error}"))?;
+    let twice = once
+        .intensity_normalized()
+        .map_err(|error| format!("second intensity_normalized should succeed: {error}"))?;
+
+    assert_eq!(once.metadata().splash(), twice.metadata().splash());
+    assert_current_structured_splash(&twice)?;
+
+    Ok(())
+}
+
+#[test]
 fn add_peak_updates_structured_splash_metadata() -> std::result::Result<(), String> {
     let mut record = valid_splash_record()?;
 

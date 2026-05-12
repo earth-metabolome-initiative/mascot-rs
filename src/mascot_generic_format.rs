@@ -469,6 +469,13 @@ impl<P: SpectrumFloat> SpectrumAlloc for MascotGenericFormat<P> {
             <GenericSpectrum<P> as SpectrumAlloc>::top_k_peaks(&self.spectrum, k)?,
         )
     }
+
+    fn intensity_normalized(&self) -> Result<Self> {
+        Self::from_edited_spectrum(
+            self.metadata.clone(),
+            <GenericSpectrum<P> as SpectrumAlloc>::intensity_normalized(&self.spectrum)?,
+        )
+    }
 }
 
 struct MGFRecordParser<P: SpectrumFloat = f64> {

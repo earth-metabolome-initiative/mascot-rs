@@ -16,6 +16,8 @@ pub mod gems_a10;
 /// GNPS spectral library helpers.
 #[cfg(feature = "std")]
 pub mod gnps;
+/// Generic iteration over selected properties of MGF records.
+pub mod iter_mgf_property;
 /// MGF record and collection types.
 pub mod mascot_generic_format;
 #[doc(hidden)]
@@ -124,6 +126,7 @@ pub mod prelude {
     pub use crate::gnps::GNPSLoad;
     #[cfg(feature = "std")]
     pub use crate::gnps::GNPS_ALL_MGF_URL;
+    pub use crate::iter_mgf_property::IterMGFProperty;
     pub use crate::mascot_generic_format::MGFIter;
     #[cfg(feature = "std")]
     pub use crate::mascot_generic_format::MGFPathIter;

@@ -11,7 +11,7 @@ use dioxus::prelude::*;
 use dioxus_free_icons::icons::fa_solid_icons::{
     FaBolt, FaChartArea, FaChartColumn, FaCircleNodes, FaFlask, FaFolderOpen, FaHashtag,
     FaLayerGroup, FaMicroscope, FaPlusMinus, FaRightLeft, FaShareNodes, FaShuffle, FaUsers, FaVial,
-    FaWaveSquare, FaWeightHanging,
+    FaWaveSquare, FaWeightHanging, FaXmark,
 };
 use dioxus_free_icons::Icon;
 
@@ -152,6 +152,9 @@ body { min-height: 100vh; margin: 0; color: var(--text); background: #fbf8f2; fo
 .button-green:hover { background: #2b6048; transform: translateY(-1px); }
 .summary { display: grid; gap: 1rem; }
 .summary h2 { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: 1.25rem; font-weight: 700; }
+.summary-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.reset-button { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; transition: color .14s, border-color .14s; }
+.reset-button:hover { color: var(--red); border-color: var(--red); }
 .cards { display: flex; flex-wrap: wrap; gap: .65rem; }
 .card { min-width: 7rem; padding: .75rem 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface-strong); }
 .card .num { font-size: 1.6rem; font-weight: 700; }
@@ -245,14 +248,26 @@ fn App() -> Element {
                     "Drop an MGF file to build a spectral similarity graph from its records."
                 }
             }
-            div { class: "panel",
-                DropZone {}
-            }
+            LoaderPanel {}
             DatasetView {}
             GraphControls {}
             GraphCanvas {}
         }
         InfoPanel {}
+    }
+}
+
+/// The MGF loading panel, shown only until a dataset is loaded.
+#[component]
+fn LoaderPanel() -> Element {
+    let dataset = use_context::<Signal<DatasetState>>();
+    if matches!(&*dataset.read(), DatasetState::Loaded { .. }) {
+        return rsx! {};
+    }
+    rsx! {
+        div { class: "panel",
+            DropZone {}
+        }
     }
 }
 
@@ -330,11 +345,32 @@ fn DatasetView() -> Element {
 /// Renders a parsed dataset summary.
 #[component]
 fn SummaryView(name: String, summary: DatasetSummary) -> Element {
+    let mut dataset = use_context::<Signal<DatasetState>>();
+    let mut graph = use_context::<Signal<GraphState>>();
+    let focus = use_context::<NodeFocus>();
+    let on_reset = move |_| {
+        let mut selected = focus.selected;
+        let mut hovered = focus.hovered;
+        selected.set(None);
+        hovered.set(None);
+        graph.set(GraphState::None);
+        dataset.set(DatasetState::Empty);
+    };
     rsx! {
         section { class: "panel summary",
-            h2 {
-                Icon { width: 18, height: 18, fill: "#b6792f", icon: FaVial }
-                span { "{name}" }
+            div { class: "summary-head",
+                h2 {
+                    Icon { width: 18, height: 18, fill: "#b6792f", icon: FaVial }
+                    span { "{name}" }
+                }
+                button {
+                    r#type: "button",
+                    class: "reset-button",
+                    title: "Clear this dataset and load another MGF.",
+                    aria_label: "Clear the dataset and return to the loading screen",
+                    onclick: on_reset,
+                    Icon { width: 16, height: 16, icon: FaXmark }
+                }
             }
             div { class: "cards",
                 Stat { num: summary.count, label: "records" }

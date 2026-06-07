@@ -1,3 +1,7 @@
+[workspace]
+members = ["crates/mascot-web"]
+resolver = "2"
+
 [package]
 name = "mascot-rs"
 version = "0.1.0"

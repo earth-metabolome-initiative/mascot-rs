@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="DejaVu Sans, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f5e8c"/>
+      <stop offset="1" stop-color="#10324d"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Similarity-graph motif, top-right corner, clear of the title -->
+  <g stroke="#ffffff" stroke-opacity="0.18" stroke-width="2" fill="none">
+    <line x1="1000" y1="70" x2="1082" y2="52"/>
+    <line x1="1000" y1="70" x2="970" y2="138"/>
+    <line x1="1082" y1="52" x2="1142" y2="104"/>
+    <line x1="970" y1="138" x2="1052" y2="150"/>
+    <line x1="1142" y1="104" x2="1052" y2="150"/>
+    <line x1="1052" y1="150" x2="1118" y2="176"/>
+  </g>
+  <g fill="#cfe2f0" fill-opacity="0.55">
+    <circle cx="1000" cy="70" r="12"/>
+    <circle cx="970" cy="138" r="9"/>
+    <circle cx="1052" cy="150" r="13"/>
+    <circle cx="1118" cy="176" r="8"/>
+  </g>
+  <g fill="#dea584" fill-opacity="0.9">
+    <circle cx="1082" cy="52" r="11"/>
+    <circle cx="1142" cy="104" r="10"/>
+  </g>
+
+  <!-- Text block -->
+  <text x="80" y="152" fill="#9fc4dd" font-size="24" font-weight="700" letter-spacing="4">EARTH METABOLOME INITIATIVE</text>
+  <text x="78" y="262" fill="#ffffff" font-size="72" font-weight="700">Spectral similarity graph</text>
+  <text x="80" y="322" fill="#dbe7f0" font-size="30">From an MGF file to an interactive similarity network,</text>
+  <text x="80" y="362" fill="#dbe7f0" font-size="30">clustered and laid out fully in your browser.</text>
+
+  <rect x="80" y="398" width="386" height="50" rx="25" fill="#ffffff" fill-opacity="0.12" stroke="#9fc4dd" stroke-opacity="0.5"/>
+  <text x="106" y="431" fill="#f3f7fa" font-size="26" font-weight="700">mgf.earthmetabolome.org</text>
+
+  <!-- Mass-spectrum stick band along the bottom, below the text -->
+  <g stroke-linecap="round">
+    <line x1="80" y1="560" x2="1120" y2="560" stroke="#ffffff" stroke-opacity="0.22" stroke-width="2"/>
+    <line x1="120" y1="560" x2="120" y2="512" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="176" y1="560" x2="176" y2="486" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="232" y1="560" x2="232" y2="498" stroke="#dea584" stroke-width="6"/>
+    <line x1="288" y1="560" x2="288" y2="520" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="344" y1="560" x2="344" y2="492" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="400" y1="560" x2="400" y2="470" stroke="#dea584" stroke-width="6"/>
+    <line x1="456" y1="560" x2="456" y2="524" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="512" y1="560" x2="512" y2="500" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="568" y1="560" x2="568" y2="514" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="624" y1="560" x2="624" y2="478" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="680" y1="560" x2="680" y2="528" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="736" y1="560" x2="736" y2="490" stroke="#dea584" stroke-width="6"/>
+    <line x1="792" y1="560" x2="792" y2="516" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="848" y1="560" x2="848" y2="488" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="904" y1="560" x2="904" y2="522" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="960" y1="560" x2="960" y2="496" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="1016" y1="560" x2="1016" y2="480" stroke="#f7efe2" stroke-width="6"/>
+    <line x1="1072" y1="560" x2="1072" y2="526" stroke="#f7efe2" stroke-width="6"/>
+  </g>
+</svg>

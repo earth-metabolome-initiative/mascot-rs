@@ -9,12 +9,20 @@
 * { box-sizing: border-box; }
 body { min-height: 100vh; margin: 0; color: var(--text); background: #fbf8f2; font-family: "IBM Plex Sans", "Avenir Next", sans-serif; }
 .page { width: min(1180px, 100vw - 2rem); margin: 0 auto; padding: 1.5rem 0 3rem; }
+.page.landing { display: flex; flex-direction: column; justify-content: center; min-height: 100vh; }
 .hero { margin-bottom: 1.25rem; }
 .eyebrow { margin: 0; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; }
 .hero h1 { margin: .35rem 0 0; font-family: Syne, "IBM Plex Sans", sans-serif; font-size: clamp(2.4rem, 6vw, 4rem); line-height: .96; }
 .hero-rust-suffix { color: var(--rust); }
-.hero-copy { max-width: 46rem; margin: .7rem 0 0; color: var(--muted); line-height: 1.6; }
+.hero-copy { margin: .7rem 0 0; color: var(--muted); line-height: 1.7; text-align: justify; text-justify: inter-word; overflow-wrap: break-word; hyphens: auto; }
+.hero-copy a { color: var(--blue); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.hero-copy a:hover { color: #184f78; }
+.hero-title-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .6rem 1rem; }
+.github-badge { display: inline-flex; align-items: center; gap: .45rem; flex-shrink: 0; padding: .4rem .85rem; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--text); font-size: .85rem; font-weight: 600; text-decoration: none; transition: border-color .14s, color .14s; }
+.github-badge:hover { border-color: var(--blue); color: var(--blue); }
 .panel { margin-bottom: 1.25rem; padding: 1.25rem; border: 1px solid var(--line); border-radius: 1.2rem; background: var(--surface); box-shadow: var(--shadow); }
+.loader-wrap { display: flex; justify-content: center; margin-top: .5rem; }
+.drop-panel { width: min(34rem, 100%); margin-bottom: 0; }
 .drop-zone { padding: 2rem; text-align: center; border: 2px dashed var(--line-strong); border-radius: 1rem; background: var(--surface-strong); transition: border-color .15s, background .15s; }
 .drop-zone.hovering { border-color: var(--blue); background: rgba(32,94,140,.06); }
 .drop-zone p { margin: 0 0 .85rem; color: var(--muted); }
@@ -67,6 +75,25 @@ body { min-height: 100vh; margin: 0; color: var(--text); background: #fbf8f2; fo
 .edge-sim-name { display: inline-flex; align-items: center; gap: .45rem; color: var(--muted); }
 .edge-sim-row.active .edge-sim-name { color: var(--text); font-weight: 600; }
 .edge-sim-value { font-family: "IBM Plex Mono", monospace; color: var(--text); }
+.export-grid { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
+.export-check { display: inline-flex; align-items: center; gap: .4rem; color: var(--text); font-size: .85rem; cursor: pointer; }
+.export-check input { width: 1rem; height: 1rem; accent-color: var(--blue); cursor: pointer; }
+.export-check input:disabled { cursor: default; }
+.export-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
+.button-green:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.view-head-right { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem .75rem; }
+.export-open { display: inline-flex; align-items: center; gap: .45rem; min-height: 2.1rem; padding: .4rem .9rem; color: #fff; background: var(--blue); border: 1px solid rgba(32,94,140,.24); border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; transition: background .14s, transform .14s; }
+.export-open:hover { background: #184f78; transform: translateY(-1px); }
+.modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1.25rem; background: rgba(20,34,41,.45); backdrop-filter: blur(2px); }
+.modal { width: min(40rem, 100%); max-height: 88vh; overflow-y: auto; padding: 1.25rem 1.4rem 1.4rem; border: 1px solid var(--line); border-radius: 1.1rem; background: var(--surface-strong); box-shadow: 0 24px 64px rgba(20,34,41,.3); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .25rem; }
+.modal-head h3 { margin: 0; font-size: 1.2rem; }
+.export-note { margin: 0 0 1rem; color: var(--muted); font-size: .82rem; }
+.export-tabs { display: flex; gap: .25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.export-tab { padding: .5rem .9rem; margin-bottom: -1px; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; font: inherit; font-weight: 600; cursor: pointer; }
+.export-tab:hover { color: var(--text); }
+.export-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.export-tab-body { min-height: 9rem; }
 .node-panel-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .node-panel-head h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
 .node-panel-close { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }

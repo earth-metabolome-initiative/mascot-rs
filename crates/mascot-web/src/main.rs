@@ -2,16 +2,18 @@
 
 mod coloring;
 mod dataset;
+mod export;
 mod layout;
 mod render;
 mod similarity;
 
 use dioxus::html::{FileData, HasFileData};
 use dioxus::prelude::*;
+use dioxus_free_icons::icons::fa_brands_icons::FaGithub;
 use dioxus_free_icons::icons::fa_solid_icons::{
-    FaBolt, FaChartArea, FaChartColumn, FaCircleNodes, FaFlask, FaFolderOpen, FaHashtag,
-    FaLayerGroup, FaMicroscope, FaPlusMinus, FaRightLeft, FaShuffle, FaUserGroup, FaUsers, FaVial,
-    FaWaveSquare, FaWeightHanging, FaXmark,
+    FaBolt, FaChartArea, FaChartColumn, FaCircleNodes, FaDownload, FaFlask, FaFolderOpen,
+    FaHashtag, FaLayerGroup, FaMicroscope, FaPlusMinus, FaRightLeft, FaShuffle, FaUserGroup,
+    FaUsers, FaVial, FaWaveSquare, FaWeightHanging, FaXmark,
 };
 use dioxus_free_icons::Icon;
 use mascot_rs::prelude::{MascotGenericFormat, Spectrum, SpectrumFloat};
@@ -267,18 +269,102 @@ fn App() -> Element {
         selected: Signal::new(None),
         hovered: Signal::new(None),
     });
+    // Before a dataset is loaded, centre the hero and drop area in the viewport;
+    // once content appears, fall back to the normal top-aligned flow.
+    let dataset = use_context::<Signal<DatasetState>>();
+    let landing = !matches!(&*dataset.read(), DatasetState::Loaded { .. });
     rsx! {
-        document::Title { "MGF similarity graph" }
-        div { class: "page",
+        div { class: if landing { "page landing" } else { "page" },
             header { class: "hero",
                 p { class: "eyebrow", "Earth Metabolome Initiative" }
-                h1 {
-                    "mascot"
-                    span { class: "hero-rust-suffix", "-rs" }
-                    " similarity graph"
+                div { class: "hero-title-row",
+                    h1 {
+                        span { class: "hero-rust-suffix", "Spectral" }
+                        " similarity graph"
+                    }
+                    a {
+                        class: "github-badge",
+                        href: "https://github.com/LucaCappelletti94/mascot-rs",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        title: "View the source code on GitHub",
+                        aria_label: "View the source code on GitHub",
+                        Icon { width: 16, height: 16, icon: FaGithub }
+                        span { "GitHub" }
+                    }
                 }
                 p { class: "hero-copy",
-                    "Drop an MGF file to build a spectral similarity graph from its records."
+                    "Drop an "
+                    a {
+                        href: "http://www.matrixscience.com/help/data_file_help.html",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "MGF"
+                    }
+                    " file to build a spectral similarity graph. Each spectrum is a node, and edges connect spectra whose fragments match under the measure you pick: "
+                    a {
+                        href: "https://doi.org/10.1016/1044-0305(94)87009-8",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "cosine"
+                    }
+                    ", "
+                    a {
+                        href: "https://doi.org/10.1038/nbt.3597",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "modified cosine"
+                    }
+                    ", "
+                    a {
+                        href: "https://doi.org/10.1038/s41592-021-01331-z",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "spectral entropy"
+                    }
+                    ", or its modified variant. Neighbours come from a "
+                    a {
+                        href: "https://doi.org/10.1038/s41592-023-02012-9",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "flash-entropy-inspired"
+                    }
+                    " index, keeping the top-k links above a score threshold. The graph is laid out with "
+                    a {
+                        href: "https://doi.org/10.1371/journal.pone.0098679",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "ForceAtlas2"
+                    }
+                    " and split into communities by "
+                    a {
+                        href: "https://doi.org/10.1088/1742-5468/2008/10/P10008",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "Louvain"
+                    }
+                    " and "
+                    a {
+                        href: "https://doi.org/10.1038/s41598-019-41695-z",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "Leiden"
+                    }
+                    ", which you can map onto node colour alongside metadata such as precursor m/z, charge, and ion mode. Duplicate spectra are flagged by their "
+                    a {
+                        href: "https://doi.org/10.1038/nbt.3689",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "SPLASH"
+                    }
+                    ". Everything runs in your browser through "
+                    a {
+                        href: "https://webassembly.org/",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        "WebAssembly"
+                    }
+                    " with no upload, ensuring complete data privacy, and you can export the node and edge tables, with all four scores, as CSV, TSV, or Parquet."
                 }
             }
             LoaderPanel {}
@@ -299,8 +385,10 @@ fn LoaderPanel() -> Element {
         return rsx! {};
     }
     rsx! {
-        div { class: "panel",
-            DropZone {}
+        div { class: "loader-wrap",
+            div { class: "panel drop-panel",
+                DropZone {}
+            }
         }
     }
 }
@@ -740,37 +828,40 @@ fn GraphCanvas() -> Element {
                     Icon { width: 18, height: 18, fill: "#38755a", icon: FaCircleNodes }
                     span { "Graph view" }
                 }
-                div { class: "graph-stats-inline",
-                    span {
-                        class: "meta-pill",
-                        title: "Spectra in the graph (one node per record).",
-                        strong { "{built.node_count}" }
-                        " nodes"
+                div { class: "view-head-right",
+                    div { class: "graph-stats-inline",
+                        span {
+                            class: "meta-pill",
+                            title: "Spectra in the graph (one node per record).",
+                            strong { "{built.node_count}" }
+                            " nodes"
+                        }
+                        span {
+                            class: "meta-pill",
+                            title: "Similarity links kept between spectra.",
+                            strong { "{built.edges.len()}" }
+                            " edges"
+                        }
+                        span {
+                            class: "meta-pill",
+                            title: "Connected components: groups of spectra linked by any chain of edges.",
+                            strong { "{built.component_count}" }
+                            " components"
+                        }
+                        span {
+                            class: "meta-pill",
+                            title: "Number of communities found by the Louvain algorithm.",
+                            strong { "{built.community_count}" }
+                            " Louvain"
+                        }
+                        span {
+                            class: "meta-pill",
+                            title: "Number of communities found by the Leiden algorithm.",
+                            strong { "{built.leiden_count}" }
+                            " Leiden"
+                        }
                     }
-                    span {
-                        class: "meta-pill",
-                        title: "Similarity links kept between spectra.",
-                        strong { "{built.edges.len()}" }
-                        " edges"
-                    }
-                    span {
-                        class: "meta-pill",
-                        title: "Connected components: groups of spectra linked by any chain of edges.",
-                        strong { "{built.component_count}" }
-                        " components"
-                    }
-                    span {
-                        class: "meta-pill",
-                        title: "Number of communities found by the Louvain algorithm.",
-                        strong { "{built.community_count}" }
-                        " Louvain"
-                    }
-                    span {
-                        class: "meta-pill",
-                        title: "Number of communities found by the Leiden algorithm.",
-                        strong { "{built.leiden_count}" }
-                        " Leiden"
-                    }
+                    ExportControl {}
                 }
             }
             div { class: "field field-wide",
@@ -1499,6 +1590,344 @@ fn MirrorSpectrumPlot(
             div { class: "mirror-legend-item",
                 span { class: "mirror-swatch", style: "background: {match_color};" }
                 span { class: "legend-label", "{match_count} matched" }
+            }
+        }
+    }
+}
+
+/// The dataset name without its file extension, for building export filenames.
+fn file_base(name: &str) -> &str {
+    name.rsplit_once('.').map_or(name, |(stem, _)| stem)
+}
+
+/// Tabs in the export dialog.
+#[derive(Clone, Copy, PartialEq)]
+enum ExportTab {
+    /// File format selection.
+    Format,
+    /// Node-list columns.
+    Nodes,
+    /// Edge-list options.
+    Edges,
+}
+
+impl ExportTab {
+    /// All tabs, in display order.
+    const ALL: [Self; 3] = [Self::Format, Self::Nodes, Self::Edges];
+
+    /// A stable identifier used as a list key.
+    const fn id(self) -> &'static str {
+        match self {
+            Self::Format => "format",
+            Self::Nodes => "nodes",
+            Self::Edges => "edges",
+        }
+    }
+
+    /// A human-readable tab label.
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Format => "Format",
+            Self::Nodes => "Nodes",
+            Self::Edges => "Edges",
+        }
+    }
+}
+
+/// The graph view's "Export" button and its configuration dialog.
+///
+/// The dialog is a self-contained modal with tabs for the file format, node
+/// columns, and edge options, plus the two download actions. Its settings only
+/// affect the downloaded files, never the graph or any other panel. Rendered
+/// inside the graph view, so it only appears once a graph is built.
+#[component]
+fn ExportControl() -> Element {
+    let dataset = use_context::<Signal<DatasetState>>();
+    let graph = use_context::<Signal<GraphState>>();
+    let params = use_context::<Signal<GraphParams>>();
+
+    let mut open = use_signal(|| false);
+    let mut tab = use_signal(|| ExportTab::Format);
+    let mut format = use_signal(|| export::OutputFormat::Csv);
+    let mut node_columns = use_signal(|| export::NodeColumn::DEFAULTS.to_vec());
+    let mut endpoint = use_signal(|| export::EndpointId::Index);
+    let mut weights = use_signal(|| SimilarityMethod::ALL.to_vec());
+
+    let dataset_ref = dataset.read();
+    let DatasetState::Loaded { records, .. } = &*dataset_ref else {
+        return rsx! {};
+    };
+    let graph_ref = graph.read();
+    let GraphState::Built(built) = &*graph_ref else {
+        return rsx! {};
+    };
+
+    let feature_issue = export::feature_id_issue(records.as_ref());
+    let endpoint_value = endpoint();
+    let blocked_edges = endpoint_value.uses_feature_id() && feature_issue.is_some();
+    let node_count = built.node_count;
+    let edge_count = built.edges.len();
+    let active_tab = tab();
+    drop(graph_ref);
+    drop(dataset_ref);
+
+    let on_download_nodes = move |_| {
+        let dataset_ref = dataset.read();
+        let DatasetState::Loaded { name, records, .. } = &*dataset_ref else {
+            return;
+        };
+        let graph_ref = graph.read();
+        let GraphState::Built(built) = &*graph_ref else {
+            return;
+        };
+        let output = format();
+        let columns: Vec<export::NodeColumn> = export::NodeColumn::ALL
+            .into_iter()
+            .filter(|column| node_columns.read().contains(column))
+            .collect();
+        let filename = format!("{}-nodes.{}", file_base(name), output.extension());
+        match output.delimiter() {
+            Some(delimiter) => {
+                let table = export::build_node_table(records.as_ref(), built, &columns, delimiter);
+                export::download_text(&filename, output.mime(), &table);
+            }
+            None => {
+                if let Ok(bytes) = export::build_node_parquet(records.as_ref(), built, &columns) {
+                    export::download_bytes(&filename, output.mime(), &bytes);
+                }
+            }
+        }
+    };
+
+    let on_download_edges = move |_| {
+        let dataset_ref = dataset.read();
+        let DatasetState::Loaded { name, records, .. } = &*dataset_ref else {
+            return;
+        };
+        let graph_ref = graph.read();
+        let GraphState::Built(built) = &*graph_ref else {
+            return;
+        };
+        let output = format();
+        let parameters = params();
+        let measures: Vec<SimilarityMethod> = SimilarityMethod::ALL
+            .into_iter()
+            .filter(|method| weights.read().contains(method))
+            .collect();
+        let filename = format!("{}-edges.{}", file_base(name), output.extension());
+        match output.delimiter() {
+            Some(delimiter) => {
+                let table = export::build_edge_table(
+                    records.as_ref(),
+                    built,
+                    &parameters,
+                    endpoint(),
+                    &measures,
+                    delimiter,
+                );
+                export::download_text(&filename, output.mime(), &table);
+            }
+            None => {
+                if let Ok(bytes) = export::build_edge_parquet(
+                    records.as_ref(),
+                    built,
+                    &parameters,
+                    endpoint(),
+                    &measures,
+                ) {
+                    export::download_bytes(&filename, output.mime(), &bytes);
+                }
+            }
+        }
+    };
+
+    rsx! {
+        button {
+            r#type: "button",
+            class: "export-open",
+            title: "Export the graph as node and edge tables.",
+            aria_label: "Open the export options",
+            onclick: move |_| open.set(true),
+            Icon { width: 15, height: 15, icon: FaDownload }
+            span { "Export" }
+        }
+        if open() {
+            div {
+                class: "modal-overlay",
+                onclick: move |_| open.set(false),
+                div {
+                    class: "modal",
+                    role: "dialog",
+                    aria_modal: "true",
+                    aria_label: "Export options",
+                    onclick: move |evt| evt.stop_propagation(),
+                    div { class: "modal-head",
+                        h3 { "Export graph" }
+                        button {
+                            r#type: "button",
+                            class: "node-panel-close",
+                            title: "Close",
+                            aria_label: "Close the export dialog",
+                            onclick: move |_| open.set(false),
+                            "\u{00d7}"
+                        }
+                    }
+                    p { class: "export-note",
+                        "These options only affect the files you download. They do not change the graph or any other panel."
+                    }
+                    div { class: "export-tabs", role: "tablist",
+                        for option in ExportTab::ALL {
+                            button {
+                                key: "{option.id()}",
+                                r#type: "button",
+                                class: if option == active_tab { "export-tab active" } else { "export-tab" },
+                                role: "tab",
+                                aria_selected: if option == active_tab { "true" } else { "false" },
+                                onclick: move |_| tab.set(option),
+                                "{option.label()}"
+                            }
+                        }
+                    }
+                    div { class: "export-tab-body",
+                        {match active_tab {
+                            ExportTab::Format => rsx! {
+                                div { class: "field field-wide",
+                                    label { "File format" }
+                                    div { class: "segmented", role: "group", aria_label: "Export file format",
+                                        for option in export::OutputFormat::ALL {
+                                            button {
+                                                key: "{option.id()}",
+                                                r#type: "button",
+                                                class: if option == format() { "segment active" } else { "segment" },
+                                                aria_pressed: if option == format() { "true" } else { "false" },
+                                                onclick: move |_| format.set(option),
+                                                span { "{option.label()}" }
+                                            }
+                                        }
+                                    }
+                                    p { class: "view-hint",
+                                        "CSV and TSV are plain-text tables. Parquet is a compact, typed columnar file for data tools."
+                                    }
+                                }
+                            },
+                            ExportTab::Nodes => rsx! {
+                                div { class: "field field-wide",
+                                    label { "Columns" }
+                                    div { class: "export-grid",
+                                        span {
+                                            class: "export-check",
+                                            title: "Always included as the join key for the edge list.",
+                                            input { r#type: "checkbox", checked: true, disabled: true, aria_label: "node_id (always included)" }
+                                            span { "node_id" }
+                                        }
+                                        for column in export::NodeColumn::ALL {
+                                            label {
+                                                key: "{column.id()}",
+                                                class: "export-check",
+                                                input {
+                                                    r#type: "checkbox",
+                                                    checked: node_columns.read().contains(&column),
+                                                    aria_label: "{column.label()}",
+                                                    onchange: move |_| {
+                                                        node_columns
+                                                            .with_mut(|list| {
+                                                                if let Some(position)
+                                                                    = list.iter().position(|candidate| *candidate == column)
+                                                                {
+                                                                    list.remove(position);
+                                                                } else {
+                                                                    list.push(column);
+                                                                }
+                                                            });
+                                                    },
+                                                }
+                                                span { "{column.label()}" }
+                                            }
+                                        }
+                                    }
+                                    p { class: "view-hint",
+                                        "node_id is always included as the join key. mgf_metadata is the raw MGF header passed through verbatim; the rest are computed by the app."
+                                    }
+                                }
+                            },
+                            ExportTab::Edges => rsx! {
+                                div { class: "field field-wide",
+                                    label { "Endpoint identifier" }
+                                    div { class: "segmented", role: "group", aria_label: "How edges reference their endpoints",
+                                        for option in export::EndpointId::ALL {
+                                            button {
+                                                key: "{option.id()}",
+                                                r#type: "button",
+                                                class: if option == endpoint_value { "segment active" } else { "segment" },
+                                                aria_pressed: if option == endpoint_value { "true" } else { "false" },
+                                                onclick: move |_| endpoint.set(option),
+                                                span { "{option.label()}" }
+                                            }
+                                        }
+                                    }
+                                }
+                                div { class: "field field-wide",
+                                    label { "Weight columns" }
+                                    div { class: "export-grid",
+                                        for method in SimilarityMethod::ALL {
+                                            label {
+                                                key: "{method.id()}",
+                                                class: "export-check",
+                                                title: method.description(),
+                                                input {
+                                                    r#type: "checkbox",
+                                                    checked: weights.read().contains(&method),
+                                                    aria_label: "{method.label()}",
+                                                    onchange: move |_| {
+                                                        weights
+                                                            .with_mut(|list| {
+                                                                if let Some(position)
+                                                                    = list.iter().position(|candidate| *candidate == method)
+                                                                {
+                                                                    list.remove(position);
+                                                                } else {
+                                                                    list.push(method);
+                                                                }
+                                                            });
+                                                    },
+                                                }
+                                                span { "{method.label()}" }
+                                            }
+                                        }
+                                    }
+                                    if blocked_edges {
+                                        if let Some(message) = feature_issue.clone() {
+                                            p { class: "error",
+                                                "{message} Switch the endpoint identifier to Index, or give every record a unique feature id, to export edges."
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                        }}
+                    }
+                    div { class: "export-actions",
+                        button {
+                            r#type: "button",
+                            class: "button-green",
+                            title: "Download the node list ({node_count} rows).",
+                            aria_label: "Download the node list",
+                            onclick: on_download_nodes,
+                            Icon { width: 16, height: 16, icon: FaDownload }
+                            span { "Download nodes ({node_count})" }
+                        }
+                        button {
+                            r#type: "button",
+                            class: "button-green",
+                            disabled: blocked_edges,
+                            title: "Download the weighted edge list ({edge_count} rows).",
+                            aria_label: "Download the weighted edge list",
+                            onclick: on_download_edges,
+                            Icon { width: 16, height: 16, icon: FaDownload }
+                            span { "Download edges ({edge_count})" }
+                        }
+                    }
+                }
             }
         }
     }

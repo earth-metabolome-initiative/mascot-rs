@@ -10,11 +10,16 @@ publish = false
 
 [dependencies]
 dioxus = { version = "0.7", features = ["web"] }
-dioxus-free-icons = { version = "0.10", features = ["font-awesome-solid"] }
+dioxus-free-icons = { version = "0.10", features = [
+    "font-awesome-solid",
+    "font-awesome-brands",
+] }
 geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", default-features = false, features = ["alloc"] }
 gloo-timers = { version = "0.3", features = ["futures"] }
+js-sys = "0.3"
 mascot-rs = { path = "../..", default-features = false }
 mass_spectrometry = { git = "https://github.com/earth-metabolome-initiative/mass-spectrometry-traits", default-features = false }
+parquet = { version = "58", default-features = false }
 wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = [
     "Document",
@@ -22,6 +27,11 @@ web-sys = { version = "0.3", features = [
     "Element",
     "HtmlCanvasElement",
     "CanvasRenderingContext2d",
+    "Blob",
+    "BlobPropertyBag",
+    "Url",
+    "HtmlAnchorElement",
+    "HtmlElement",
 ] }
 
 [lints.clippy]

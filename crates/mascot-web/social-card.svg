@@ -41,7 +41,7 @@
   <text x="80" y="322" fill="#dbe7f0" font-size="30">From an MGF file to an interactive similarity network,</text>
   <text x="80" y="362" fill="#dbe7f0" font-size="30">clustered and laid out fully in your browser.</text>
 
-  <rect x="80" y="398" width="386" height="50" rx="25" fill="#ffffff" fill-opacity="0.12" stroke="#9fc4dd" stroke-opacity="0.5"/>
+  <rect x="80" y="398" width="443" height="50" rx="25" fill="#ffffff" fill-opacity="0.12" stroke="#9fc4dd" stroke-opacity="0.5"/>
   <text x="106" y="431" fill="#f3f7fa" font-size="26" font-weight="700">mgf.earthmetabolome.org</text>
 
   <!-- Mass-spectrum stick band along the bottom, below the text -->

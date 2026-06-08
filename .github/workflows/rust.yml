@@ -69,3 +69,8 @@ jobs:
           use_oidc: true
           files: coverage/cobertura.xml
           fail_ci_if_error: true
+          # The action verifies the downloaded CLI against a GPG key it fetches
+          # from keybase.io, which is flaky and intermittently aborts the upload
+          # with "Can't check signature: No public key". Skip that integrity
+          # check; the CLI is still fetched over HTTPS from cli.codecov.io.
+          skip_validation: true

@@ -45,3 +45,7 @@ wasm-bindgen-cli-support = "=0.2.120"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }
+# Dioxus `rsx!` expands single-variable interpolations like `"{color}"` into
+# `format!("{color}")`, which clippy flags as a useless format. The expansion is
+# macro-generated, so allow the lint rather than rewrite idiomatic markup.
+useless_format = "allow"

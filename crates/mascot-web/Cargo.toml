@@ -1,0 +1,47 @@
+[package]
+name = "mascot-web"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luca Cappelletti <cappelletti.luca94@gmail.com>"]
+description = "Dioxus web app to visualize MGF spectra as a spectral similarity graph"
+repository = "https://github.com/LucaCappelletti94/mascot-rs"
+license = "MIT"
+publish = false
+
+[dependencies]
+dioxus = { version = "0.7", features = ["web"] }
+dioxus-free-icons = { version = "0.10", features = [
+    "font-awesome-solid",
+    "font-awesome-brands",
+] }
+futures = { version = "0.3", default-features = false, features = ["std"] }
+gloo-timers = { version = "0.3", features = ["futures"] }
+js-sys = "0.3"
+mascot-rs = { path = "../..", default-features = false }
+mascot-web-core = { path = "../mascot-web-core" }
+parquet = { version = "58", default-features = false }
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+    "Document",
+    "Window",
+    "Element",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "Blob",
+    "BlobPropertyBag",
+    "Url",
+    "HtmlAnchorElement",
+    "HtmlElement",
+    "Worker",
+    "WorkerOptions",
+    "WorkerType",
+    "MessageEvent",
+    "ErrorEvent",
+] }
+
+[build-dependencies]
+wasm-bindgen-cli-support = "=0.2.120"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

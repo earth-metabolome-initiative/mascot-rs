@@ -1,0 +1,4 @@
+[web.app]
+# Sets the static <title> in index.html so the tab title is correct before the
+# WASM app mounts (avoids a flash of the default "dioxus" title on load).
+title = "Spectral similarity graph"

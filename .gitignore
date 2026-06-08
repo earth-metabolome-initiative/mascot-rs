@@ -20,3 +20,6 @@ tarpaulin-report.json
 .DS_Store
 
 .ipynb_checkpoints
+
+# Playwright MCP browser-test artifacts
+.playwright-mcp/

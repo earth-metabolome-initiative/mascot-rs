@@ -1,3 +1,10 @@
+<!--
+  Source for the Open Graph social card. Text positions assume the DejaVu Sans
+  metrics, so this file is the build input only and is NOT served (browsers that
+  lack DejaVu Sans would substitute a different font and shift the layout). The
+  served, font-baked raster is public/social-card.png, regenerated with:
+    rsvg-convert -w 1200 -h 630 social-card.svg -o public/social-card.png
+-->
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="DejaVu Sans, sans-serif">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">

@@ -50,6 +50,13 @@ jobs:
       - name: Install Dioxus CLI
         run: cargo install dioxus-cli --locked --version 0.7.6
 
+      # dx copies static assets into its output dir but never prunes stale ones,
+      # and the cached `target` can carry files removed from the source (for
+      # example a social-card.svg that is no longer served). Wipe the bundle so
+      # the uploaded artifact only contains what this build produced.
+      - name: Clean previous web bundle
+        run: rm -rf target/dx/mascot-web/release/web
+
       - name: Build web app
         run: dx build --platform web --release --package mascot-web
 

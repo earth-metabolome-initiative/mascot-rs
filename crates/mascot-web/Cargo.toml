@@ -14,12 +14,13 @@ dioxus-free-icons = { version = "0.10", features = [
     "font-awesome-solid",
     "font-awesome-brands",
 ] }
-geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", default-features = false, features = ["alloc"] }
+futures = { version = "0.3", default-features = false, features = ["std"] }
 gloo-timers = { version = "0.3", features = ["futures"] }
 js-sys = "0.3"
 mascot-rs = { path = "../..", default-features = false }
-mass_spectrometry = { git = "https://github.com/earth-metabolome-initiative/mass-spectrometry-traits", default-features = false }
+mascot-web-core = { path = "../mascot-web-core" }
 parquet = { version = "58", default-features = false }
+serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = [
     "Document",
@@ -32,7 +33,15 @@ web-sys = { version = "0.3", features = [
     "Url",
     "HtmlAnchorElement",
     "HtmlElement",
+    "Worker",
+    "WorkerOptions",
+    "WorkerType",
+    "MessageEvent",
+    "ErrorEvent",
 ] }
+
+[build-dependencies]
+wasm-bindgen-cli-support = "=0.2.120"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }

@@ -3,9 +3,9 @@
 mod coloring;
 mod dataset;
 mod export;
-mod layout;
 mod render;
 mod similarity;
+mod worker;
 
 use dioxus::html::{FileData, HasFileData};
 use dioxus::prelude::*;
@@ -269,6 +269,9 @@ fn App() -> Element {
         selected: Signal::new(None),
         hovered: Signal::new(None),
     });
+    // Spawn the graph-building Web Worker once. `None` (worker unsupported) makes
+    // `GraphControls` fall back to building on the main thread.
+    use_context_provider(worker::WorkerClient::spawn);
     // Before a dataset is loaded, centre the hero and drop area in the viewport;
     // once content appears, fall back to the normal top-aligned flow.
     let dataset = use_context::<Signal<DatasetState>>();
@@ -470,19 +473,30 @@ fn GraphControls() -> Element {
     let mut params = use_context::<Signal<GraphParams>>();
     let graph = use_context::<Signal<GraphState>>();
     let focus = use_context::<NodeFocus>();
+    let worker = use_context::<Option<worker::WorkerClient>>();
     // Rebuild the graph (debounced) whenever the dataset or parameters change.
     // `use_resource` cancels the in-flight future when a tracked dependency
     // changes, so the leading delay coalesces rapid edits into a single build.
     // `params()` and `dataset` are read before the first `.await` so they are
-    // tracked. Colour-scheme changes are handled by the renderer, not here.
-    let build = use_resource(move || async move {
-        let parameters = params();
-        let _ = dataset.read();
-        gloo_timers::future::TimeoutFuture::new(200).await;
-        dataset
-            .peek()
-            .records()
-            .map(|records| build_graph(records.as_ref(), &parameters))
+    // tracked. The build runs in a Web Worker (off the main thread); if the
+    // worker is unavailable it falls back to building inline. Colour-scheme
+    // changes are handled by the renderer, not here.
+    let build = use_resource(move || {
+        let worker = worker.clone();
+        async move {
+            let parameters = params();
+            let _ = dataset.read();
+            gloo_timers::future::TimeoutFuture::new(200).await;
+            let text = dataset.peek().text().map(str::to_string)?;
+            let result = match &worker {
+                Some(worker) => worker.build(&text, &parameters).await,
+                None => match dataset.peek().records() {
+                    Some(records) => build_graph(records.as_ref(), &parameters),
+                    None => return None,
+                },
+            };
+            Some(result)
+        }
     });
 
     // Reflect the build outcome into the shared graph state.
@@ -1652,6 +1666,7 @@ fn ExportControl() -> Element {
     let mut node_columns = use_signal(|| export::NodeColumn::DEFAULTS.to_vec());
     let mut endpoint = use_signal(|| export::EndpointId::Index);
     let mut weights = use_signal(|| SimilarityMethod::ALL.to_vec());
+    let mut export_error = use_signal(|| None::<String>);
 
     let dataset_ref = dataset.read();
     let DatasetState::Loaded { records, .. } = &*dataset_ref else {
@@ -1686,16 +1701,16 @@ fn ExportControl() -> Element {
             .filter(|column| node_columns.read().contains(column))
             .collect();
         let filename = format!("{}-nodes.{}", file_base(name), output.extension());
+        export_error.set(None);
         match output.delimiter() {
             Some(delimiter) => {
                 let table = export::build_node_table(records.as_ref(), built, &columns, delimiter);
                 export::download_text(&filename, output.mime(), &table);
             }
-            None => {
-                if let Ok(bytes) = export::build_node_parquet(records.as_ref(), built, &columns) {
-                    export::download_bytes(&filename, output.mime(), &bytes);
-                }
-            }
+            None => match export::build_node_parquet(records.as_ref(), built, &columns) {
+                Ok(bytes) => export::download_bytes(&filename, output.mime(), &bytes),
+                Err(error) => export_error.set(Some(format!("Parquet export failed: {error}"))),
+            },
         }
     };
 
@@ -1715,6 +1730,7 @@ fn ExportControl() -> Element {
             .filter(|method| weights.read().contains(method))
             .collect();
         let filename = format!("{}-edges.{}", file_base(name), output.extension());
+        export_error.set(None);
         match output.delimiter() {
             Some(delimiter) => {
                 let table = export::build_edge_table(
@@ -1727,17 +1743,16 @@ fn ExportControl() -> Element {
                 );
                 export::download_text(&filename, output.mime(), &table);
             }
-            None => {
-                if let Ok(bytes) = export::build_edge_parquet(
-                    records.as_ref(),
-                    built,
-                    &parameters,
-                    endpoint(),
-                    &measures,
-                ) {
-                    export::download_bytes(&filename, output.mime(), &bytes);
-                }
-            }
+            None => match export::build_edge_parquet(
+                records.as_ref(),
+                built,
+                &parameters,
+                endpoint(),
+                &measures,
+            ) {
+                Ok(bytes) => export::download_bytes(&filename, output.mime(), &bytes),
+                Err(error) => export_error.set(Some(format!("Parquet export failed: {error}"))),
+            },
         }
     };
 
@@ -1906,6 +1921,9 @@ fn ExportControl() -> Element {
                             },
                         }}
                     }
+                    if let Some(message) = export_error() {
+                        p { class: "error", "{message}" }
+                    }
                     div { class: "export-actions",
                         button {
                             r#type: "button",
@@ -1948,6 +1966,7 @@ fn load_dataset(
     let summary = dataset::summarize(&records, skipped);
     state.set(DatasetState::Loaded {
         name,
+        text: text.to_string(),
         records,
         summary,
     });

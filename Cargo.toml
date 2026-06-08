@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/mascot-web"]
+members = ["crates/mascot-web", "crates/mascot-web-core", "crates/mascot-web-worker"]
 resolver = "2"
 
 [package]

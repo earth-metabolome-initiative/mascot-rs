@@ -39,6 +39,8 @@ pub enum DatasetState {
     Loaded {
         /// Name of the loaded file.
         name: String,
+        /// The raw MGF text, kept so the graph build can run in a Web Worker.
+        text: String,
         /// The parsed records.
         records: Records,
         /// A summary derived from the records.
@@ -62,21 +64,24 @@ impl DatasetState {
             _ => None,
         }
     }
+
+    /// Returns the raw MGF text when the dataset is loaded.
+    #[must_use]
+    pub fn text(&self) -> Option<&str> {
+        match self {
+            Self::Loaded { text, .. } => Some(text),
+            _ => None,
+        }
+    }
 }
 
-/// Parses an MGF document, skipping malformed records.
+/// Parses an MGF document, skipping malformed records (shared with the worker).
 ///
 /// Returns the collected records together with the number of malformed ion
 /// blocks that were skipped.
 #[must_use]
 pub fn parse_mgf(text: &str) -> (Records, usize) {
-    let mut iter = MGFVec::iter_from_str(text).skipping_invalid_records();
-    let mut records: Vec<MascotGenericFormat> = Vec::new();
-    for record in iter.by_ref().flatten() {
-        records.push(record);
-    }
-    let skipped = iter.skipped_records();
-    (MGFVec::from(records), skipped)
+    mascot_web_core::parse_mgf(text)
 }
 
 /// A stable key for a precursor m/z, rounded to 4 decimals.

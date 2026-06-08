@@ -6,17 +6,12 @@
 //! aborting the whole load, because real-world MGF exports often contain a few
 //! bad records.
 
-use std::collections::BTreeMap;
+use std::collections::HashSet;
 
-use mascot_rs::prelude::{MGFVec, MascotGenericFormat};
+use mascot_rs::prelude::{MGFVec, MascotGenericFormat, Spectrum, SpectrumFloat, SpectrumSplash};
 
 /// Parsed MGF records held by the app, at f64 precision.
 pub type Records = MGFVec;
-
-/// A counted breakdown of one categorical metadata field.
-///
-/// Each entry is a `(label, count)` pair, sorted by label.
-pub type Breakdown = Vec<(String, usize)>;
 
 /// A lightweight, display-oriented summary of a loaded dataset.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -25,18 +20,10 @@ pub struct DatasetSummary {
     pub count: usize,
     /// Number of malformed ion blocks skipped during parsing.
     pub skipped: usize,
-    /// Records carrying a SMILES annotation.
-    pub with_smiles: usize,
-    /// Records carrying a molecular formula.
-    pub with_formula: usize,
-    /// Count of records per MS level.
-    pub ms_levels: Breakdown,
-    /// Count of records per ion mode.
-    pub ion_modes: Breakdown,
-    /// Count of records per precursor charge.
-    pub charges: Breakdown,
-    /// Count of records per source instrument.
-    pub instruments: Breakdown,
+    /// Records whose SPLASH is shared by an earlier record (likely duplicates).
+    pub duplicate_splash: usize,
+    /// Records whose precursor m/z is shared by an earlier record.
+    pub shared_pepmass: usize,
 }
 
 /// The current state of the single dataset the app works with.
@@ -85,76 +72,52 @@ impl DatasetState {
 pub fn parse_mgf(text: &str) -> (Records, usize) {
     let mut iter = MGFVec::iter_from_str(text).skipping_invalid_records();
     let mut records: Vec<MascotGenericFormat> = Vec::new();
-    while let Some(item) = iter.next() {
-        if let Ok(record) = item {
-            records.push(record);
-        }
+    for record in iter.by_ref().flatten() {
+        records.push(record);
     }
     let skipped = iter.skipped_records();
     (MGFVec::from(records), skipped)
 }
 
-/// Increments the counter for `label` in a sorted-map accumulator.
-fn bump(map: &mut BTreeMap<String, usize>, label: String) {
-    *map.entry(label).or_insert(0) += 1;
+/// A stable key for a precursor m/z, rounded to 4 decimals.
+fn pepmass_key(record: &MascotGenericFormat) -> i64 {
+    (record.precursor_mz().to_f64() * 10_000.0).round() as i64
 }
 
-/// Flattens a sorted-map accumulator into a [`Breakdown`].
-fn flatten(map: BTreeMap<String, usize>) -> Breakdown {
-    map.into_iter().collect()
+/// The SPLASH of a record, preferring the value carried in the MGF metadata and
+/// otherwise computing it from the peaks.
+fn splash_key(record: &MascotGenericFormat) -> Option<String> {
+    record
+        .metadata()
+        .splash()
+        .map(ToString::to_string)
+        .or_else(|| record.splash().ok())
 }
 
-/// Derives a [`DatasetSummary`] from parsed records.
+/// Derives a [`DatasetSummary`] from parsed records, including duplicate checks
+/// on SPLASH and precursor m/z (pepmass).
 #[must_use]
 pub fn summarize(records: &Records, skipped: usize) -> DatasetSummary {
-    let mut ms_levels = BTreeMap::new();
-    let mut ion_modes = BTreeMap::new();
-    let mut charges = BTreeMap::new();
-    let mut instruments = BTreeMap::new();
-    let mut with_smiles = 0;
-    let mut with_formula = 0;
+    let mut seen_splash: HashSet<String> = HashSet::new();
+    let mut seen_pepmass: HashSet<i64> = HashSet::new();
+    let mut duplicate_splash = 0;
+    let mut shared_pepmass = 0;
 
     for record in records.iter() {
-        let metadata = record.metadata();
-
-        let level = metadata
-            .level()
-            .map_or_else(|| "unknown".to_string(), |level| level.to_string());
-        bump(&mut ms_levels, level);
-
-        let ion_mode = metadata
-            .ion_mode()
-            .map_or("unknown", |mode| mode.as_str())
-            .to_string();
-        bump(&mut ion_modes, ion_mode);
-
-        let charge = metadata
-            .charge()
-            .map_or_else(|| "unknown".to_string(), |charge| charge.to_string());
-        bump(&mut charges, charge);
-
-        let instrument = metadata
-            .source_instrument()
-            .map_or("unknown", |instrument| instrument.as_str())
-            .to_string();
-        bump(&mut instruments, instrument);
-
-        if metadata.smiles().is_some() {
-            with_smiles += 1;
+        if let Some(splash) = splash_key(record) {
+            if !seen_splash.insert(splash) {
+                duplicate_splash += 1;
+            }
         }
-        if metadata.formula().is_some() {
-            with_formula += 1;
+        if !seen_pepmass.insert(pepmass_key(record)) {
+            shared_pepmass += 1;
         }
     }
 
     DatasetSummary {
         count: records.len(),
         skipped,
-        with_smiles,
-        with_formula,
-        ms_levels: flatten(ms_levels),
-        ion_modes: flatten(ion_modes),
-        charges: flatten(charges),
-        instruments: flatten(instruments),
+        duplicate_splash,
+        shared_pepmass,
     }
 }

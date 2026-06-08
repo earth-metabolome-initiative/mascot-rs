@@ -30,10 +30,32 @@ impl Default for ViewTransform {
     }
 }
 
-/// Qualitative colour palette, seeded with the splash app accents.
-const PALETTE: [&str; 10] = [
-    "#205e8c", "#dea584", "#38755a", "#9d4133", "#b6792f", "#3b6ea5", "#4c8c6b", "#8c4a3b",
-    "#6b4a9e", "#2f7d7d",
+/// Qualitative colour palette, seeded with the app accents. Ordered so the
+/// first dozen entries (which cover the common case of a handful of groups) are
+/// maximally distinct hues; later entries fill in second shades. Twenty colours
+/// combined with [`SHAPE_COUNT`] marker shapes give `lcm(20, 6) = 60` distinct
+/// node identities before any colour-and-shape pair repeats.
+const PALETTE: [&str; 20] = [
+    "#205e8c", // blue
+    "#c1432b", // red
+    "#3c8c52", // green
+    "#8a4fa3", // purple
+    "#d2811e", // amber
+    "#2f8f8f", // teal
+    "#b8417a", // magenta
+    "#7d8c2a", // olive
+    "#9c5a2c", // brown
+    "#cf5a36", // coral
+    "#a23a5e", // raspberry
+    "#2aa18c", // emerald
+    "#5a5fb0", // indigo
+    "#3f7fb5", // steel blue
+    "#6fa023", // leaf green
+    "#4fa37a", // mint
+    "#b34a3a", // rust
+    "#7a5cc0", // violet
+    "#9a7d1c", // dark gold
+    "#c24f9a", // orchid
 ];
 
 /// Returns a stable palette colour for a group index.
@@ -218,17 +240,85 @@ pub fn edge_hit_test(
     best.map(|(index, _)| index)
 }
 
+/// Number of distinct node marker shapes used to encode categorical groups.
+pub const SHAPE_COUNT: usize = 6;
+
+/// Traces a marker shape (selected by `shape % SHAPE_COUNT`) as a path centred
+/// at `(x, y)` with radius `r`, then fills and strokes it with the current
+/// context styles.
+fn draw_marker(context: &web_sys::CanvasRenderingContext2d, shape: usize, x: f64, y: f64, r: f64) {
+    context.begin_path();
+    match shape % SHAPE_COUNT {
+        1 => {
+            // Square.
+            context.rect(x - r, y - r, 2.0 * r, 2.0 * r);
+        }
+        2 => {
+            // Triangle pointing up.
+            let half = r * 0.95;
+            context.move_to(x, y - r);
+            context.line_to(x + half, y + r * 0.7);
+            context.line_to(x - half, y + r * 0.7);
+            context.close_path();
+        }
+        3 => {
+            // Diamond.
+            context.move_to(x, y - r);
+            context.line_to(x + r, y);
+            context.line_to(x, y + r);
+            context.line_to(x - r, y);
+            context.close_path();
+        }
+        4 => {
+            // Triangle pointing down.
+            let half = r * 0.95;
+            context.move_to(x, y + r);
+            context.line_to(x + half, y - r * 0.7);
+            context.line_to(x - half, y - r * 0.7);
+            context.close_path();
+        }
+        5 => {
+            // Hexagon with a vertex at the top.
+            for corner in 0..6 {
+                let angle =
+                    core::f64::consts::FRAC_PI_3 * f64::from(corner) - core::f64::consts::FRAC_PI_2;
+                let px = x + r * angle.cos();
+                let py = y + r * angle.sin();
+                if corner == 0 {
+                    context.move_to(px, py);
+                } else {
+                    context.line_to(px, py);
+                }
+            }
+            context.close_path();
+        }
+        _ => {
+            // Circle.
+            let _ = context.arc(x, y, r, 0.0, core::f64::consts::TAU);
+        }
+    }
+    context.fill();
+    context.stroke();
+}
+
 /// Draws the similarity graph into the `<canvas>` identified by [`CANVAS_ID`].
 ///
 /// `positions` gives the live (possibly dragged) node coordinates; the
 /// projection's fit comes from `graph.coordinates`, so dragging stays stable.
-/// `colors` is the fill per node and `highlight` rings the active node.
+/// `colors` is the fill per node and `highlight` rings the active node. When
+/// `categorical` is set, `groups` selects a marker shape per node and edges
+/// within a group are drawn in that group's colour. `highlight_edge` draws the
+/// focused edge (its two endpoint indices) with a bold accent stroke.
+#[allow(clippy::too_many_arguments)]
 pub fn draw_graph(
     graph: &SimilarityGraph,
     positions: &[[f64; 2]],
     view: ViewTransform,
     colors: &[String],
+    groups: &[usize],
+    categorical: bool,
     highlight: Option<usize>,
+    highlight_edge: Option<(usize, usize)>,
 ) {
     let Some(window) = web_sys::window() else {
         return;
@@ -283,14 +373,21 @@ pub fn draw_graph(
             .map(|&point| projection.to_screen(point))
     };
 
-    // Edges first, so nodes sit on top.
-    context.set_stroke_style_str("#627077");
+    // Edges first, so nodes sit on top. Edges within one group are tinted with
+    // that group's colour to reinforce community membership; the rest are grey.
     context.set_line_width(1.0);
     for &(u, v, score) in &graph.edges {
         let (Some(a), Some(b)) = (screen_of(u), screen_of(v)) else {
             continue;
         };
-        context.set_global_alpha((0.12 + 0.7 * score).clamp(0.05, 0.9));
+        let same_group = categorical && groups.get(u).is_some() && groups.get(u) == groups.get(v);
+        if same_group {
+            context.set_stroke_style_str(colors.get(u).map_or("#627077", String::as_str));
+            context.set_global_alpha((0.3 + 0.6 * score).clamp(0.1, 0.95));
+        } else {
+            context.set_stroke_style_str("#627077");
+            context.set_global_alpha((0.1 + 0.45 * score).clamp(0.05, 0.6));
+        }
         context.begin_path();
         context.move_to(a.0, a.1);
         context.line_to(b.0, b.1);
@@ -298,7 +395,21 @@ pub fn draw_graph(
     }
     context.set_global_alpha(1.0);
 
-    // Nodes.
+    // The focused edge, drawn bold so the selection is clear. Endpoint markers
+    // are painted afterwards, so the line reads as a link between two nodes.
+    if let Some((u, v)) = highlight_edge {
+        if let (Some(a), Some(b)) = (screen_of(u), screen_of(v)) {
+            context.set_stroke_style_str("#9d4133");
+            context.set_line_width(3.0);
+            context.begin_path();
+            context.move_to(a.0, a.1);
+            context.line_to(b.0, b.1);
+            context.stroke();
+            context.set_line_width(1.0);
+        }
+    }
+
+    // Nodes, shaped by group (categorical schemes) and filled by colour.
     let radius = node_radius(view);
     context.set_line_width(1.0);
     context.set_stroke_style_str("#15232b");
@@ -307,11 +418,13 @@ pub fn draw_graph(
             continue;
         };
         let color = colors.get(index).map_or("#205e8c", String::as_str);
+        let shape = if categorical {
+            groups.get(index).copied().unwrap_or(0)
+        } else {
+            0
+        };
         context.set_fill_style_str(color);
-        context.begin_path();
-        let _ = context.arc(x, y, radius, 0.0, core::f64::consts::TAU);
-        context.fill();
-        context.stroke();
+        draw_marker(&context, shape, x, y, radius);
     }
 
     // Highlight ring on the active node.

@@ -17,10 +17,10 @@ use crate::similarity::SimilarityGraph;
 /// How nodes are grouped or scaled for colouring.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorScheme {
-    /// Connected component (undirected analog of SCC).
-    Component,
     /// Louvain community.
     Community,
+    /// Leiden community.
+    LeidenCommunity,
     /// Spectrum ion mode.
     IonMode,
     /// Spectrum precursor charge.
@@ -40,8 +40,8 @@ pub enum ColorScheme {
 impl ColorScheme {
     /// All schemes, in display order.
     pub const ALL: [Self; 9] = [
-        Self::Component,
         Self::Community,
+        Self::LeidenCommunity,
         Self::IonMode,
         Self::Charge,
         Self::MsLevel,
@@ -55,8 +55,8 @@ impl ColorScheme {
     #[must_use]
     pub const fn id(self) -> &'static str {
         match self {
-            Self::Component => "component",
             Self::Community => "community",
+            Self::LeidenCommunity => "leiden-community",
             Self::IonMode => "ion-mode",
             Self::Charge => "charge",
             Self::MsLevel => "ms-level",
@@ -71,8 +71,8 @@ impl ColorScheme {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Component => "Connected component",
             Self::Community => "Community (Louvain)",
+            Self::LeidenCommunity => "Community (Leiden)",
             Self::IonMode => "Ion mode",
             Self::Charge => "Charge",
             Self::MsLevel => "MS level",
@@ -87,11 +87,11 @@ impl ColorScheme {
     #[must_use]
     pub const fn description(self) -> &'static str {
         match self {
-            Self::Component => {
-                "Colour by connected component: spectra joined by any chain of edges share a colour."
-            }
             Self::Community => {
                 "Colour by Louvain community: tightly interconnected clusters detected within the graph."
+            }
+            Self::LeidenCommunity => {
+                "Colour by Leiden community: a refinement of Louvain that guarantees every community is internally connected."
             }
             Self::IonMode => "Colour by precursor ion mode (positive or negative).",
             Self::Charge => "Colour by precursor charge state.",
@@ -109,8 +109,8 @@ impl ColorScheme {
     #[must_use]
     pub const fn accent(self) -> &'static str {
         match self {
-            Self::Component => "#205e8c",
             Self::Community => "#6b4a9e",
+            Self::LeidenCommunity => "#205e8c",
             Self::IonMode => "#38755a",
             Self::Charge => "#9d4133",
             Self::MsLevel => "#b6792f",
@@ -132,6 +132,7 @@ impl ColorScheme {
 }
 
 /// The legend describing the active colouring.
+#[derive(Debug, Clone, PartialEq)]
 pub enum Legend {
     /// Discrete `(label, colour)` entries, in first-appearance order.
     Categorical(Vec<(String, String)>),
@@ -145,9 +146,15 @@ pub enum Legend {
 }
 
 /// A computed colouring: a colour per node plus a legend.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Coloring {
     /// Colour per node, index-aligned with the graph nodes.
     pub colors: Vec<String>,
+    /// Group index per node (for categorical schemes), selecting marker shape
+    /// and intra-group edge colour. All zero for continuous schemes.
+    pub groups: Vec<usize>,
+    /// Whether the scheme is categorical (groups and shapes are meaningful).
+    pub categorical: bool,
     /// The legend describing the colouring.
     pub legend: Legend,
 }
@@ -190,13 +197,13 @@ fn node_labels(
     records: &[MascotGenericFormat],
 ) -> Vec<String> {
     match scheme {
-        ColorScheme::Component => graph
-            .component_of_node
-            .iter()
-            .map(|component| format!("Component {component}"))
-            .collect(),
         ColorScheme::Community => graph
             .community_of_node
+            .iter()
+            .map(|community| format!("Community {community}"))
+            .collect(),
+        ColorScheme::LeidenCommunity => graph
+            .leiden_of_node
             .iter()
             .map(|community| format!("Community {community}"))
             .collect(),
@@ -305,6 +312,8 @@ pub fn compute(
             .collect();
         return Coloring {
             colors,
+            groups: vec![0; values.len()],
+            categorical: false,
             legend: Legend::Continuous { min, max },
         };
     }
@@ -318,9 +327,10 @@ pub fn compute(
             order.push(label.clone());
         }
     }
-    let colors = labels
+    let groups: Vec<usize> = labels.iter().map(|label| index_of[label]).collect();
+    let colors = groups
         .iter()
-        .map(|label| palette_color(index_of[label]).to_string())
+        .map(|&group| palette_color(group).to_string())
         .collect();
     let legend = Legend::Categorical(
         order
@@ -329,5 +339,10 @@ pub fn compute(
             .map(|(index, label)| (label.clone(), palette_color(index).to_string()))
             .collect(),
     );
-    Coloring { colors, legend }
+    Coloring {
+        colors,
+        groups,
+        categorical: true,
+        legend,
+    }
 }

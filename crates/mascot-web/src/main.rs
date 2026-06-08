@@ -10,10 +10,15 @@ use dioxus::html::{FileData, HasFileData};
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::fa_solid_icons::{
     FaBolt, FaChartArea, FaChartColumn, FaCircleNodes, FaFlask, FaFolderOpen, FaHashtag,
-    FaLayerGroup, FaMicroscope, FaPlusMinus, FaRightLeft, FaShareNodes, FaShuffle, FaUsers, FaVial,
+    FaLayerGroup, FaMicroscope, FaPlusMinus, FaRightLeft, FaShuffle, FaUserGroup, FaUsers, FaVial,
     FaWaveSquare, FaWeightHanging, FaXmark,
 };
 use dioxus_free_icons::Icon;
+use mascot_rs::prelude::{MascotGenericFormat, Spectrum, SpectrumFloat};
+
+use crate::coloring::ColorScheme;
+use crate::dataset::DatasetState;
+use crate::similarity::{build_graph, GraphParams, SimilarityGraph, SimilarityMethod};
 
 /// Renders the icon for a similarity method, with the given fill colour.
 fn similarity_icon(method: SimilarityMethod, fill: String) -> Element {
@@ -33,13 +38,101 @@ fn similarity_icon(method: SimilarityMethod, fill: String) -> Element {
     }
 }
 
+/// Renders a small SVG legend marker matching the canvas node shape for a
+/// group index, filled with `color`.
+fn node_marker_svg(group: usize, color: String) -> Element {
+    let stroke = "#15232b";
+    let center = 7.0_f64;
+    let radius = 5.0_f64;
+    let corner = center - radius;
+    let side = 2.0 * radius;
+    match group % render::SHAPE_COUNT {
+        1 => rsx! {
+            svg { class: "legend-marker", width: "14", height: "14", view_box: "0 0 14 14",
+                rect {
+                    x: "{corner}",
+                    y: "{corner}",
+                    width: "{side}",
+                    height: "{side}",
+                    fill: "{color}",
+                    stroke,
+                    stroke_width: "1",
+                }
+            }
+        },
+        2 => {
+            let apex_y = center - radius;
+            let base_y = center + radius * 0.7;
+            let half = radius * 0.95;
+            let left = center - half;
+            let right = center + half;
+            let points = format!("{center},{apex_y} {right},{base_y} {left},{base_y}");
+            rsx! {
+                svg { class: "legend-marker", width: "14", height: "14", view_box: "0 0 14 14",
+                    polygon { points: "{points}", fill: "{color}", stroke, stroke_width: "1" }
+                }
+            }
+        }
+        3 => {
+            let top = center - radius;
+            let bottom = center + radius;
+            let left = center - radius;
+            let right = center + radius;
+            let points =
+                format!("{center},{top} {right},{center} {center},{bottom} {left},{center}");
+            rsx! {
+                svg { class: "legend-marker", width: "14", height: "14", view_box: "0 0 14 14",
+                    polygon { points: "{points}", fill: "{color}", stroke, stroke_width: "1" }
+                }
+            }
+        }
+        4 => {
+            let apex_y = center + radius;
+            let base_y = center - radius * 0.7;
+            let half = radius * 0.95;
+            let left = center - half;
+            let right = center + half;
+            let points = format!("{center},{apex_y} {right},{base_y} {left},{base_y}");
+            rsx! {
+                svg { class: "legend-marker", width: "14", height: "14", view_box: "0 0 14 14",
+                    polygon { points: "{points}", fill: "{color}", stroke, stroke_width: "1" }
+                }
+            }
+        }
+        5 => {
+            let points = (0..6)
+                .map(|corner| {
+                    let angle = std::f64::consts::FRAC_PI_3 * f64::from(corner)
+                        - std::f64::consts::FRAC_PI_2;
+                    format!(
+                        "{:.2},{:.2}",
+                        center + radius * angle.cos(),
+                        center + radius * angle.sin()
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            rsx! {
+                svg { class: "legend-marker", width: "14", height: "14", view_box: "0 0 14 14",
+                    polygon { points: "{points}", fill: "{color}", stroke, stroke_width: "1" }
+                }
+            }
+        }
+        _ => rsx! {
+            svg { class: "legend-marker", width: "14", height: "14", view_box: "0 0 14 14",
+                circle { cx: "{center}", cy: "{center}", r: "{radius}", fill: "{color}", stroke, stroke_width: "1" }
+            }
+        },
+    }
+}
+
 /// Renders the icon for a colour scheme, with the given fill colour.
 fn scheme_icon(scheme: ColorScheme, fill: String) -> Element {
     match scheme {
-        ColorScheme::Component => {
-            rsx! { Icon { width: 14, height: 14, fill, icon: FaCircleNodes } }
-        }
         ColorScheme::Community => rsx! { Icon { width: 14, height: 14, fill, icon: FaUsers } },
+        ColorScheme::LeidenCommunity => {
+            rsx! { Icon { width: 14, height: 14, fill, icon: FaUserGroup } }
+        }
         ColorScheme::IonMode => rsx! { Icon { width: 14, height: 14, fill, icon: FaPlusMinus } },
         ColorScheme::Charge => rsx! { Icon { width: 14, height: 14, fill, icon: FaBolt } },
         ColorScheme::MsLevel => rsx! { Icon { width: 14, height: 14, fill, icon: FaLayerGroup } },
@@ -55,11 +148,6 @@ fn scheme_icon(scheme: ColorScheme, fill: String) -> Element {
         }
     }
 }
-use mascot_rs::prelude::{MascotGenericFormat, Spectrum, SpectrumFloat};
-
-use crate::coloring::ColorScheme;
-use crate::dataset::{Breakdown, DatasetState, DatasetSummary};
-use crate::similarity::{build_graph, GraphParams, SimilarityGraph, SimilarityMethod};
 
 /// State of the computed similarity graph.
 enum GraphState {
@@ -120,94 +208,25 @@ impl NodeFocus {
     }
 }
 
-/// App stylesheet, adopting the Earth Metabolome Initiative SPLASH app theme
-/// (palette, typography, pill controls, and panel cards) from
-/// <https://splash.earthmetabolome.org/>.
-const CSS: &str = r#"
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Syne:wght@500;700;800&display=swap');
-:root {
-    --bg: #f6f0e6; --surface: rgba(255,252,247,.94); --surface-strong: rgba(255,255,255,.98);
-    --line: rgba(20,34,41,.1); --line-strong: rgba(20,34,41,.17);
-    --text: #15232b; --muted: #627077;
-    --blue: #205e8c; --rust: #dea584; --green: #38755a; --red: #9d4133;
-    --shadow: 0 18px 48px rgba(27,44,54,.08);
+/// The hovered and selected edge, shared between the graph and the edge panel.
+///
+/// Each field is the index of an edge in `SimilarityGraph::edges`. Indices are
+/// only valid for the current built graph and are reset when a new graph is
+/// built (see the reset effect in `GraphCanvas`).
+#[derive(Clone, Copy)]
+struct EdgeFocus {
+    /// The clicked (pinned) edge, if any.
+    selected: Signal<Option<usize>>,
+    /// The hovered edge, if any.
+    hovered: Signal<Option<usize>>,
 }
-* { box-sizing: border-box; }
-body { min-height: 100vh; margin: 0; color: var(--text); background: #fbf8f2; font-family: "IBM Plex Sans", "Avenir Next", sans-serif; }
-.page { width: min(1180px, 100vw - 2rem); margin: 0 auto; padding: 1.5rem 0 3rem; }
-.hero { margin-bottom: 1.25rem; }
-.eyebrow { margin: 0; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; }
-.hero h1 { margin: .35rem 0 0; font-family: Syne, "IBM Plex Sans", sans-serif; font-size: clamp(2.4rem, 6vw, 4rem); line-height: .96; }
-.hero-rust-suffix { color: var(--rust); }
-.hero-copy { max-width: 46rem; margin: .7rem 0 0; color: var(--muted); line-height: 1.6; }
-.panel { margin-bottom: 1.25rem; padding: 1.25rem; border: 1px solid var(--line); border-radius: 1.2rem; background: var(--surface); box-shadow: var(--shadow); }
-.drop-zone { padding: 2rem; text-align: center; border: 2px dashed var(--line-strong); border-radius: 1rem; background: var(--surface-strong); transition: border-color .15s, background .15s; }
-.drop-zone.hovering { border-color: var(--blue); background: rgba(32,94,140,.06); }
-.drop-zone p { margin: 0 0 .85rem; color: var(--muted); }
-.file-button { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.35rem; padding: .45rem 1rem; color: #fff; background: var(--blue); border: 1px solid rgba(32,94,140,.24); border-radius: 999px; cursor: pointer; transition: background .14s, transform .14s; }
-.file-button:hover { background: #184f78; transform: translateY(-1px); }
-.file-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.drop-actions { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; }
-.button-green { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.35rem; padding: .45rem 1rem; color: #fff; background: var(--green); border: 1px solid rgba(56,117,90,.3); border-radius: 999px; font: inherit; cursor: pointer; transition: background .14s, transform .14s; }
-.button-green:hover { background: #2b6048; transform: translateY(-1px); }
-.summary { display: grid; gap: 1rem; }
-.summary h2 { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: 1.25rem; font-weight: 700; }
-.summary-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.reset-button { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; transition: color .14s, border-color .14s; }
-.reset-button:hover { color: var(--red); border-color: var(--red); }
-.cards { display: flex; flex-wrap: wrap; gap: .65rem; }
-.card { min-width: 7rem; padding: .75rem 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface-strong); }
-.card .num { font-size: 1.6rem; font-weight: 700; }
-.card .lbl { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: .78rem; letter-spacing: .04em; }
-.breakdowns { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; }
-.breakdown { overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: rgba(255,253,250,.74); }
-.breakdown h3 { margin: 0; padding: .7rem .85rem; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; border-bottom: 1px solid var(--line); }
-.breakdown table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-.breakdown td { padding: .5rem .85rem; border-bottom: 1px solid rgba(20,34,41,.06); }
-.breakdown tr:last-child td { border-bottom: 0; }
-.breakdown td.count { text-align: right; color: var(--muted); font-family: "IBM Plex Mono", monospace; }
-.controls-title { display: flex; align-items: center; gap: .5rem; margin: 0 0 1rem; font-size: 1.25rem; font-weight: 700; }
-.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; align-items: end; }
-.field { display: grid; gap: .35rem; }
-.field label { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
-.field select, .field input { width: 100%; padding: .5rem .65rem; color: var(--text); background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: .7rem; font: inherit; outline: none; }
-.field select:focus, .field input:focus { border-color: rgba(23,112,168,.4); box-shadow: 0 0 0 4px rgba(23,112,168,.08); }
-.build-row { display: flex; gap: .75rem; align-items: center; margin-top: 1rem; }
-.button-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 2.35rem; padding: .45rem 1.1rem; color: #fff; background: var(--blue); border: 1px solid rgba(32,94,140,.24); border-radius: 999px; font: inherit; cursor: pointer; transition: background .14s, transform .14s; }
-.button-primary:hover { background: #184f78; transform: translateY(-1px); }
-.graph-stats { margin-top: 1rem; }
-.field-wide { grid-column: 1 / -1; }
-.segmented { display: flex; flex-wrap: wrap; gap: .4rem; }
-.segment { display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .85rem; color: var(--text); background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: 999px; font: inherit; cursor: pointer; transition: background .14s, color .14s, border-color .14s; }
-.segment:hover { color: var(--accent, var(--blue)); border-color: var(--accent, var(--blue)); }
-.segment.active { color: #fff; background: var(--accent, var(--blue)); border-color: var(--accent, var(--blue)); }
-.segment.active:hover { color: #fff; }
-.view-hint { margin: 0 0 .75rem; color: var(--muted); font-size: .9rem; }
-.legend { display: flex; flex-wrap: wrap; gap: .5rem .9rem; margin-top: .85rem; }
-.legend-item { display: inline-flex; align-items: center; gap: .4rem; color: var(--muted); font-size: .82rem; }
-.legend-swatch { display: inline-block; width: .8rem; height: .8rem; border-radius: 999px; border: 1px solid rgba(20,34,41,.25); }
-.legend-label { font-family: "IBM Plex Mono", monospace; }
-.legend-continuous { align-items: center; gap: .6rem; }
-.legend-bar { display: inline-block; width: 12rem; max-width: 50vw; height: .7rem; border-radius: 999px; border: 1px solid rgba(20,34,41,.2); }
-.node-panel { position: fixed; top: 0; right: 0; width: 360px; max-width: 92vw; height: 100vh; overflow-y: auto; padding: 1.25rem; background: var(--surface-strong); border-left: 1px solid var(--line); box-shadow: -16px 0 48px rgba(27,44,54,.14); z-index: 60; }
-.node-panel-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.node-panel-head h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
-.node-panel-close { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
-.node-panel-close:hover { color: var(--red); border-color: var(--red); }
-.node-panel-hint { margin: .35rem 0 0; color: var(--muted); font-size: .82rem; }
-.spectrum-wrap { margin: .9rem 0; padding: .4rem; border: 1px solid var(--line); border-radius: .75rem; background: #fbf8f2; }
-.spectrum { display: block; width: 100%; height: auto; }
-.spectrum-readout { margin-top: .4rem; min-height: 1.1rem; font-family: "IBM Plex Mono", monospace; font-size: .8rem; }
-.spectrum-value { color: var(--text); }
-.kv { display: grid; grid-template-columns: auto 1fr; gap: .3rem .8rem; margin: 0; font-size: .88rem; }
-.kv dt { color: var(--muted); font-family: "IBM Plex Mono", monospace; }
-.kv dd { margin: 0; overflow-wrap: anywhere; }
-.graph-canvas-wrap { position: relative; }
-.edge-tooltip { position: absolute; transform: translate(-50%, -150%); padding: .2rem .5rem; background: var(--text); color: #fff; border-radius: .4rem; font-family: "IBM Plex Mono", monospace; font-size: .72rem; white-space: nowrap; pointer-events: none; z-index: 5; }
-.graph-canvas { display: block; width: 100%; height: 540px; border: 1px solid var(--line); border-radius: 1rem; background: #fbf8f2; cursor: grab; touch-action: none; }
-.graph-canvas:active { cursor: grabbing; }
-.error { color: var(--red); }
-"#;
+
+impl EdgeFocus {
+    /// The edge to show details for: the selection takes priority over hover.
+    fn active(self) -> Option<usize> {
+        (*self.selected.read()).or(*self.hovered.read())
+    }
+}
 
 /// A bundled example MGF (a SIRIUS-derived DBGI feature list) so the app can be
 /// explored without uploading a file.
@@ -215,6 +234,17 @@ const EXAMPLE_MGF: &str = include_str!("../assets/example.mgf");
 
 /// Display name for the bundled example.
 const EXAMPLE_NAME: &str = "example.mgf";
+
+// Register the stylesheet so `dx` writes a `<link>` into the static `<head>` at
+// build time (`with_static_head`) with a preload hint (`with_preload`). Loading
+// the CSS before the WASM app mounts avoids a flash of unstyled content; a
+// runtime `document::Stylesheet` would only inject the link after first paint.
+const _: Asset = asset!(
+    "/assets/main.css",
+    AssetOptions::css()
+        .with_static_head(true)
+        .with_preload(true)
+);
 
 fn main() {
     dioxus::launch(App);
@@ -228,14 +258,17 @@ fn App() -> Element {
     use_context_provider(|| Signal::new(DatasetState::Empty));
     use_context_provider(|| Signal::new(GraphParams::default()));
     use_context_provider(|| Signal::new(GraphState::None));
-    use_context_provider(|| Signal::new(ColorScheme::Component));
+    use_context_provider(|| Signal::new(ColorScheme::LeidenCommunity));
     use_context_provider(|| NodeFocus {
+        selected: Signal::new(None),
+        hovered: Signal::new(None),
+    });
+    use_context_provider(|| EdgeFocus {
         selected: Signal::new(None),
         hovered: Signal::new(None),
     });
     rsx! {
         document::Title { "MGF similarity graph" }
-        document::Style { {CSS} }
         div { class: "page",
             header { class: "hero",
                 p { class: "eyebrow", "Earth Metabolome Initiative" }
@@ -254,6 +287,7 @@ fn App() -> Element {
             GraphCanvas {}
         }
         InfoPanel {}
+        EdgePanel {}
     }
 }
 
@@ -335,88 +369,9 @@ fn DatasetView() -> Element {
                 p { class: "error", "Failed to load {name}: {error}" }
             }
         },
-        DatasetState::Loaded { name, summary, .. } => rsx! {
-            SummaryView { name: name.clone(), summary: summary.clone() }
-        },
+        DatasetState::Loaded { .. } => rsx! {},
     };
     rendered
-}
-
-/// Renders a parsed dataset summary.
-#[component]
-fn SummaryView(name: String, summary: DatasetSummary) -> Element {
-    let mut dataset = use_context::<Signal<DatasetState>>();
-    let mut graph = use_context::<Signal<GraphState>>();
-    let focus = use_context::<NodeFocus>();
-    let on_reset = move |_| {
-        let mut selected = focus.selected;
-        let mut hovered = focus.hovered;
-        selected.set(None);
-        hovered.set(None);
-        graph.set(GraphState::None);
-        dataset.set(DatasetState::Empty);
-    };
-    rsx! {
-        section { class: "panel summary",
-            div { class: "summary-head",
-                h2 {
-                    Icon { width: 18, height: 18, fill: "#b6792f", icon: FaVial }
-                    span { "{name}" }
-                }
-                button {
-                    r#type: "button",
-                    class: "reset-button",
-                    title: "Clear this dataset and load another MGF.",
-                    aria_label: "Clear the dataset and return to the loading screen",
-                    onclick: on_reset,
-                    Icon { width: 16, height: 16, icon: FaXmark }
-                }
-            }
-            div { class: "cards",
-                Stat { num: summary.count, label: "records" }
-                Stat { num: summary.skipped, label: "skipped" }
-                Stat { num: summary.with_smiles, label: "with SMILES" }
-                Stat { num: summary.with_formula, label: "with formula" }
-            }
-            div { class: "breakdowns",
-                BreakdownTable { title: "MS level", items: summary.ms_levels.clone() }
-                BreakdownTable { title: "Ion mode", items: summary.ion_modes.clone() }
-                BreakdownTable { title: "Charge", items: summary.charges.clone() }
-                BreakdownTable { title: "Instrument", items: summary.instruments.clone() }
-            }
-        }
-    }
-}
-
-/// A single headline statistic card.
-#[component]
-fn Stat(num: usize, label: String) -> Element {
-    rsx! {
-        div { class: "card",
-            div { class: "num", "{num}" }
-            div { class: "lbl", "{label}" }
-        }
-    }
-}
-
-/// A titled table of `(label, count)` rows.
-#[component]
-fn BreakdownTable(title: String, items: Breakdown) -> Element {
-    rsx! {
-        div { class: "breakdown",
-            h3 { "{title}" }
-            table {
-                tbody {
-                    for (label , count) in items {
-                        tr {
-                            td { "{label}" }
-                            td { class: "count", "{count}" }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 /// Controls for choosing the similarity measure and edge thresholds, plus the
@@ -426,51 +381,95 @@ fn GraphControls() -> Element {
     let dataset = use_context::<Signal<DatasetState>>();
     let mut params = use_context::<Signal<GraphParams>>();
     let graph = use_context::<Signal<GraphState>>();
-    let mut build_generation = use_signal(|| 0_u64);
-
-    // Rebuild automatically when the dataset or parameters change, debounced so
-    // quick successive changes coalesce into a single build. Colour-scheme
-    // changes are handled by the renderer and do not rebuild the graph.
-    use_effect(move || {
-        let _ = params();
-        let loaded = dataset.read().records().is_some();
-        if !loaded {
-            return;
-        }
-        let generation = build_generation.peek().wrapping_add(1);
-        build_generation.set(generation);
-        spawn(async move {
-            gloo_timers::future::TimeoutFuture::new(200).await;
-            if *build_generation.peek() != generation {
-                return; // superseded by a newer change during the debounce window
-            }
-            let parameters = *params.peek();
-            let outcome = dataset
-                .peek()
-                .records()
-                .map(|records| build_graph(records.as_ref(), &parameters));
-            if *build_generation.peek() != generation {
-                return;
-            }
-            let mut graph = graph;
-            match outcome {
-                Some(Ok(built)) => graph.set(GraphState::Built(built)),
-                Some(Err(error)) => graph.set(GraphState::Error(error)),
-                None => {}
-            }
-        });
+    let focus = use_context::<NodeFocus>();
+    // Rebuild the graph (debounced) whenever the dataset or parameters change.
+    // `use_resource` cancels the in-flight future when a tracked dependency
+    // changes, so the leading delay coalesces rapid edits into a single build.
+    // `params()` and `dataset` are read before the first `.await` so they are
+    // tracked. Colour-scheme changes are handled by the renderer, not here.
+    let build = use_resource(move || async move {
+        let parameters = params();
+        let _ = dataset.read();
+        gloo_timers::future::TimeoutFuture::new(200).await;
+        dataset
+            .peek()
+            .records()
+            .map(|records| build_graph(records.as_ref(), &parameters))
     });
 
-    if dataset.read().records().is_none() {
+    // Reflect the build outcome into the shared graph state.
+    use_effect(move || {
+        let mut graph = graph;
+        match &*build.read() {
+            Some(Some(Ok(built))) => graph.set(GraphState::Built(built.clone())),
+            Some(Some(Err(error))) => graph.set(GraphState::Error(error.clone())),
+            _ => {}
+        }
+    });
+
+    let loaded = dataset.read();
+    let DatasetState::Loaded { name, summary, .. } = &*loaded else {
         return rsx! {};
-    }
+    };
+    let name = name.clone();
+    let summary = summary.clone();
+    drop(loaded);
     let current = params();
+    let on_reset = move |_| {
+        let mut selected = focus.selected;
+        let mut hovered = focus.hovered;
+        let mut graph = graph;
+        let mut dataset = dataset;
+        selected.set(None);
+        hovered.set(None);
+        graph.set(GraphState::None);
+        dataset.set(DatasetState::Empty);
+    };
 
     rsx! {
         section { class: "panel",
-            h2 { class: "controls-title",
-                Icon { width: 18, height: 18, fill: "#205e8c", icon: FaShareNodes }
-                span { "Similarity graph" }
+            div { class: "dataset-bar",
+                span {
+                    class: "dataset-name",
+                    title: "The loaded MGF file.",
+                    aria_label: "Loaded MGF file: {name}",
+                    Icon { width: 18, height: 18, fill: "#b6792f", icon: FaVial }
+                    span { "{name}" }
+                }
+                span {
+                    class: "meta-pill",
+                    title: "Number of spectra (records) parsed from the MGF file.",
+                    strong { "{summary.count}" }
+                    " records"
+                }
+                if summary.skipped > 0 {
+                    span {
+                        class: "meta-pill warn",
+                        title: "Malformed ion blocks skipped during parsing.",
+                        strong { "{summary.skipped}" }
+                        " skipped"
+                    }
+                }
+                span {
+                    class: if summary.duplicate_splash > 0 { "meta-pill warn" } else { "meta-pill" },
+                    title: "Records whose SPLASH identifier matches an earlier record (likely duplicate spectra).",
+                    strong { "{summary.duplicate_splash}" }
+                    " duplicate SPLASH"
+                }
+                span {
+                    class: if summary.shared_pepmass > 0 { "meta-pill warn" } else { "meta-pill" },
+                    title: "Records whose precursor m/z (pepmass) matches an earlier record.",
+                    strong { "{summary.shared_pepmass}" }
+                    " shared m/z"
+                }
+                button {
+                    r#type: "button",
+                    class: "reset-button",
+                    title: "Clear this dataset and load another MGF.",
+                    aria_label: "Clear the dataset and return to the loading screen",
+                    onclick: on_reset,
+                    Icon { width: 16, height: 16, icon: FaXmark }
+                }
             }
             div { class: "controls",
                 div { class: "field field-wide",
@@ -574,30 +573,24 @@ fn GraphControls() -> Element {
                     }
                 }
             }
-            GraphResultView {}
+            if let GraphState::Error(error) = &*graph.read() {
+                p { class: "error", "Graph build failed: {error}" }
+            }
         }
     }
 }
 
-/// Renders the result of the most recent graph build.
-#[component]
-fn GraphResultView() -> Element {
-    let graph = use_context::<Signal<GraphState>>();
-    let rendered = match &*graph.read() {
-        GraphState::None => rsx! {},
-        GraphState::Error(error) => rsx! {
-            p { class: "error", "Graph build failed: {error}" }
-        },
-        GraphState::Built(built) => rsx! {
-            div { class: "cards graph-stats",
-                Stat { num: built.node_count, label: "nodes" }
-                Stat { num: built.edges.len(), label: "edges" }
-                Stat { num: built.component_count, label: "components" }
-                Stat { num: built.community_count, label: "communities" }
-            }
-        },
-    };
-    rendered
+/// Derived colouring for the current graph, recomputed only when the graph,
+/// colour scheme, or dataset changes.
+#[derive(Clone, PartialEq)]
+struct GraphColoring {
+    /// Colour schemes that actually distinguish nodes.
+    available: Vec<ColorScheme>,
+    /// The scheme used to colour (the selection, or the first available one if
+    /// the selection has become trivial).
+    effective: ColorScheme,
+    /// Per-node colours, groups, and the legend.
+    coloring: coloring::Coloring,
 }
 
 /// Pannable, zoomable canvas view of the built similarity graph, with a
@@ -608,8 +601,11 @@ fn GraphCanvas() -> Element {
     let dataset = use_context::<Signal<DatasetState>>();
     let mut scheme = use_context::<Signal<ColorScheme>>();
     let focus = use_context::<NodeFocus>();
+    let edge_focus = use_context::<EdgeFocus>();
     let mut selected = focus.selected;
     let mut hovered = focus.hovered;
+    let mut edge_selected = edge_focus.selected;
+    let mut edge_hovered = edge_focus.hovered;
     let mut view = use_signal(render::ViewTransform::default);
     // Live node positions (mutated by dragging) and the fixed reference layout
     // that anchors the projection so dragging does not rescale the view.
@@ -618,12 +614,41 @@ fn GraphCanvas() -> Element {
     let mut drag = use_signal(|| Drag::None);
     let mut hovered_edge = use_signal(|| None::<EdgeHover>);
 
+    // Derive the available schemes, effective scheme, and colouring once per
+    // (graph, scheme, dataset) change; shared by the body and the redraw effect.
+    let coloring_memo = use_memo(move || -> Option<GraphColoring> {
+        let graph_ref = graph.read();
+        let GraphState::Built(built) = &*graph_ref else {
+            return None;
+        };
+        let current = scheme();
+        let dataset_ref = dataset.read();
+        let records: &[MascotGenericFormat] = dataset_ref.records().map_or(&[], AsRef::as_ref);
+        let available: Vec<ColorScheme> = ColorScheme::ALL
+            .into_iter()
+            .filter(|candidate| coloring::is_informative(*candidate, built, records))
+            .collect();
+        let effective = if available.contains(&current) {
+            current
+        } else {
+            available.first().copied().unwrap_or(current)
+        };
+        let coloring = coloring::compute(effective, built, records);
+        Some(GraphColoring {
+            available,
+            effective,
+            coloring,
+        })
+    });
+
     // Reset positions, view, and selection whenever a new graph is built.
     use_effect(move || {
         let graph_ref = graph.read();
         view.set(render::ViewTransform::default());
         selected.set(None);
         hovered.set(None);
+        edge_selected.set(None);
+        edge_hovered.set(None);
         if let GraphState::Built(built) = &*graph_ref {
             positions.set(built.coordinates.clone());
             reference.set(built.coordinates.clone());
@@ -633,42 +658,28 @@ fn GraphCanvas() -> Element {
         }
     });
 
-    // Redraw whenever the graph, colours, view, positions, or focus change.
+    // Redraw whenever the graph, colouring, view, positions, or focus change.
     use_effect(move || {
         let transform = view();
-        let active = scheme();
         let highlight = focus.active();
+        let active_edge = edge_focus.active();
         let positions_snapshot = positions();
+        let memo = coloring_memo.read();
         let graph_ref = graph.read();
-        if let GraphState::Built(built) = &*graph_ref {
-            let dataset_ref = dataset.read();
-            let records: &[MascotGenericFormat] = dataset_ref.records().map_or(&[], AsRef::as_ref);
-            let coloring = coloring::compute(active, built, records);
+        if let (GraphState::Built(built), Some(view_coloring)) = (&*graph_ref, memo.as_ref()) {
+            let highlight_edge = active_edge
+                .and_then(|index| built.edges.get(index))
+                .map(|&(u, v, _)| (u, v));
             render::draw_graph(
                 built,
                 &positions_snapshot,
                 transform,
-                &coloring.colors,
+                &view_coloring.coloring.colors,
+                &view_coloring.coloring.groups,
+                view_coloring.coloring.categorical,
                 highlight,
+                highlight_edge,
             );
-        }
-    });
-
-    // If the active scheme became trivial (all nodes one group), switch to the
-    // first scheme that still distinguishes nodes.
-    use_effect(move || {
-        let graph_ref = graph.read();
-        if let GraphState::Built(built) = &*graph_ref {
-            let dataset_ref = dataset.read();
-            let records: &[MascotGenericFormat] = dataset_ref.records().map_or(&[], AsRef::as_ref);
-            if !coloring::is_informative(*scheme.peek(), built, records) {
-                if let Some(first) = ColorScheme::ALL
-                    .into_iter()
-                    .find(|candidate| coloring::is_informative(*candidate, built, records))
-                {
-                    scheme.set(first);
-                }
-            }
         }
     });
 
@@ -676,29 +687,23 @@ fn GraphCanvas() -> Element {
     let GraphState::Built(built) = &*graph_ref else {
         return rsx! {};
     };
-    let current_scheme = scheme();
-    let dataset_ref = dataset.read();
-    let records: &[MascotGenericFormat] = dataset_ref.records().map_or(&[], AsRef::as_ref);
-    // Only offer colour schemes that actually distinguish nodes; a scheme whose
-    // values are all equal (e.g. a single charge or ion mode) is dropped.
-    let available: Vec<ColorScheme> = ColorScheme::ALL
-        .into_iter()
-        .filter(|candidate| coloring::is_informative(*candidate, built, records))
-        .collect();
-    let effective_scheme = if available.contains(&current_scheme) {
-        current_scheme
-    } else {
-        available.first().copied().unwrap_or(current_scheme)
+    let memo = coloring_memo.read();
+    let Some(view_coloring) = memo.as_ref() else {
+        return rsx! {};
     };
-    let legend_markup = match coloring::compute(effective_scheme, built, records).legend {
+    let effective_scheme = view_coloring.effective;
+    let legend_markup = match &view_coloring.coloring.legend {
         coloring::Legend::Categorical(entries) => {
             let shown = entries.len().min(24);
             let extra = entries.len().saturating_sub(shown);
             rsx! {
                 div { class: "legend",
-                    for (label , color) in entries.into_iter().take(shown) {
-                        div { class: "legend-item",
-                            span { class: "legend-swatch", style: "background: {color};" }
+                    for (index , (label , color)) in entries.iter().take(shown).enumerate() {
+                        div {
+                            key: "{label}",
+                            class: "legend-item",
+                            title: "Nodes coloured as {label}.",
+                            {node_marker_svg(index, color.clone())}
                             span { class: "legend-label", "{label}" }
                         }
                     }
@@ -730,14 +735,48 @@ fn GraphCanvas() -> Element {
 
     rsx! {
         section { class: "panel",
-            h2 { class: "controls-title",
-                Icon { width: 18, height: 18, fill: "#38755a", icon: FaCircleNodes }
-                span { "Graph view" }
+            div { class: "view-head",
+                h2 { class: "controls-title",
+                    Icon { width: 18, height: 18, fill: "#38755a", icon: FaCircleNodes }
+                    span { "Graph view" }
+                }
+                div { class: "graph-stats-inline",
+                    span {
+                        class: "meta-pill",
+                        title: "Spectra in the graph (one node per record).",
+                        strong { "{built.node_count}" }
+                        " nodes"
+                    }
+                    span {
+                        class: "meta-pill",
+                        title: "Similarity links kept between spectra.",
+                        strong { "{built.edges.len()}" }
+                        " edges"
+                    }
+                    span {
+                        class: "meta-pill",
+                        title: "Connected components: groups of spectra linked by any chain of edges.",
+                        strong { "{built.component_count}" }
+                        " components"
+                    }
+                    span {
+                        class: "meta-pill",
+                        title: "Number of communities found by the Louvain algorithm.",
+                        strong { "{built.community_count}" }
+                        " Louvain"
+                    }
+                    span {
+                        class: "meta-pill",
+                        title: "Number of communities found by the Leiden algorithm.",
+                        strong { "{built.leiden_count}" }
+                        " Leiden"
+                    }
+                }
             }
             div { class: "field field-wide",
                 label { title: "Choose which property maps to node colour: graph structure, spectrum metadata, or a per-spectrum heatmap.", "Colour by" }
                 div { class: "segmented", role: "group", aria_label: "Node colouring scheme",
-                    for option in available {
+                    for option in view_coloring.available.iter().copied() {
                         button {
                             key: "{option.id()}",
                             r#type: "button",
@@ -776,11 +815,37 @@ fn GraphCanvas() -> Element {
                     match hit {
                         Some(index) => {
                             selected.set(Some(index));
+                            edge_selected.set(None);
                             drag.set(Drag::Node { index });
                         }
                         None => {
-                            selected.set(None);
-                            drag.set(Drag::Pan { x: point.x, y: point.y });
+                            // No node under the cursor: pin an edge if one is
+                            // hit, otherwise clear and start panning.
+                            let edge_index = if let GraphState::Built(built) = &*graph.peek() {
+                                render::edge_hit_test(
+                                    built,
+                                    positions.peek().as_slice(),
+                                    *view.peek(),
+                                    width,
+                                    height,
+                                    point.x,
+                                    point.y,
+                                )
+                            } else {
+                                None
+                            };
+                            match edge_index {
+                                Some(index) => {
+                                    edge_selected.set(Some(index));
+                                    selected.set(None);
+                                    drag.set(Drag::None);
+                                }
+                                None => {
+                                    selected.set(None);
+                                    edge_selected.set(None);
+                                    drag.set(Drag::Pan { x: point.x, y: point.y });
+                                }
+                            }
                         }
                     }
                 },
@@ -829,7 +894,7 @@ fn GraphCanvas() -> Element {
                                 hovered.set(node_hit);
                             }
                             // Nodes take precedence; only probe edges off a node.
-                            let edge = if node_hit.is_some() {
+                            let edge_index = if node_hit.is_some() {
                                 None
                             } else if let GraphState::Built(built) = &*graph.peek() {
                                 render::edge_hit_test(
@@ -841,12 +906,26 @@ fn GraphCanvas() -> Element {
                                     point.x,
                                     point.y,
                                 )
-                                .and_then(|index| built.edges.get(index).map(|&(_, _, score)| score))
-                                .map(|score| EdgeHover { score, x: point.x, y: point.y })
                             } else {
                                 None
                             };
-                            hovered_edge.set(edge);
+                            // Cursor-following tooltip carries the live position.
+                            let tooltip = edge_index.and_then(|index| {
+                                if let GraphState::Built(built) = &*graph.peek() {
+                                    built.edges.get(index).map(|&(_, _, score)| EdgeHover {
+                                        score,
+                                        x: point.x,
+                                        y: point.y,
+                                    })
+                                } else {
+                                    None
+                                }
+                            });
+                            hovered_edge.set(tooltip);
+                            // The mirror panel and canvas highlight track the index.
+                            if *edge_hovered.peek() != edge_index {
+                                edge_hovered.set(edge_index);
+                            }
                         }
                     }
                 },
@@ -855,6 +934,7 @@ fn GraphCanvas() -> Element {
                     drag.set(Drag::None);
                     hovered.set(None);
                     hovered_edge.set(None);
+                    edge_hovered.set(None);
                 },
                 onwheel: move |evt| {
                     evt.prevent_default();
@@ -864,15 +944,27 @@ fn GraphCanvas() -> Element {
                     });
                 },
             }
-            if let Some(edge) = hovered_edge() {
-                div {
-                    class: "edge-tooltip",
-                    style: "left: {edge.x}px; top: {edge.y}px;",
-                    "similarity {edge.score:.3}"
-                }
-            }
+            EdgeTooltip { hover: hovered_edge }
             }
             {legend_markup}
+        }
+    }
+}
+
+/// A cursor-following tooltip showing the similarity of the hovered edge.
+///
+/// Isolated into its own component so edge hover only re-renders this, not the
+/// whole graph panel.
+#[component]
+fn EdgeTooltip(hover: Signal<Option<EdgeHover>>) -> Element {
+    let Some(edge) = hover() else {
+        return rsx! {};
+    };
+    rsx! {
+        div {
+            class: "edge-tooltip",
+            style: "left: {edge.x}px; top: {edge.y}px;",
+            "similarity {edge.score:.3}"
         }
     }
 }
@@ -898,16 +990,10 @@ fn InfoPanel() -> Element {
         return rsx! {};
     };
 
-    let title = record
-        .metadata()
-        .feature_id()
-        .map_or_else(|| format!("Spectrum #{index}"), str::to_string);
+    let title = spectrum_title(record, index);
     let pinned = selected.read().is_some();
     let rows = node_detail_rows(record);
-    let peaks: Vec<(f64, f64)> = record
-        .peaks()
-        .map(|(mz, intensity)| (mz.to_f64(), intensity.to_f64()))
-        .collect();
+    let peaks = record_peaks(record);
 
     rsx! {
         aside { class: "node-panel",
@@ -929,6 +1015,150 @@ fn InfoPanel() -> Element {
                 p { class: "node-panel-hint", "Click the node to keep this open." }
             }
             div { class: "spectrum-wrap", SpectrumPlot { peaks } }
+            dl { class: "kv",
+                for (label , value) in rows {
+                    dt { "{label}" }
+                    dd { "{value}" }
+                }
+            }
+        }
+    }
+}
+
+/// A short display title for a spectrum: its feature id, or `Spectrum #index`.
+fn spectrum_title(record: &MascotGenericFormat, index: usize) -> String {
+    record
+        .metadata()
+        .feature_id()
+        .map_or_else(|| format!("Spectrum #{index}"), str::to_string)
+}
+
+/// Collects a record's peaks as `(m/z, intensity)` pairs at f64 precision.
+fn record_peaks(record: &MascotGenericFormat) -> Vec<(f64, f64)> {
+    record
+        .peaks()
+        .map(|(mz, intensity)| (mz.to_f64(), intensity.to_f64()))
+        .collect()
+}
+
+/// Right-side panel comparing the two spectra joined by the active edge as a
+/// mirror (butterfly) plot. The node panel takes precedence when a node is
+/// active, so the two panels never overlap.
+///
+/// The active edge is the selection if pinned, otherwise the hovered edge.
+#[component]
+fn EdgePanel() -> Element {
+    let node_focus = use_context::<NodeFocus>();
+    // A node panel, when shown, occupies the same space; give it precedence.
+    if node_focus.active().is_some() {
+        return rsx! {};
+    }
+    let edge_focus = use_context::<EdgeFocus>();
+    let graph = use_context::<Signal<GraphState>>();
+    let dataset = use_context::<Signal<DatasetState>>();
+    let params = use_context::<Signal<GraphParams>>();
+    let mut edge_selected = edge_focus.selected;
+    let mut edge_hovered = edge_focus.hovered;
+
+    let Some(edge_index) = edge_focus.active() else {
+        return rsx! {};
+    };
+    let graph_ref = graph.read();
+    let GraphState::Built(built) = &*graph_ref else {
+        return rsx! {};
+    };
+    let Some(&(top_node, bottom_node, score)) = built.edges.get(edge_index) else {
+        return rsx! {};
+    };
+    let dataset_ref = dataset.read();
+    let Some(records) = dataset_ref.records().map(AsRef::as_ref) else {
+        return rsx! {};
+    };
+    let (Some(top_record), Some(bottom_record)) = (records.get(top_node), records.get(bottom_node))
+    else {
+        return rsx! {};
+    };
+
+    let top_label = spectrum_title(top_record, top_node);
+    let bottom_label = spectrum_title(bottom_record, bottom_node);
+    let top_peaks = record_peaks(top_record);
+    let bottom_peaks = record_peaks(bottom_record);
+    let parameters = params();
+    let tolerance = parameters.mz_tolerance;
+    let active = parameters.method;
+    let pinned = edge_selected.read().is_some();
+
+    // Every similarity measure for this pair, not just the one that built the
+    // graph. The active method's row shows the exact edge weight so the panel
+    // agrees with the graph and the hover tooltip.
+    let sim_rows: Vec<(SimilarityMethod, String, bool)> =
+        crate::similarity::pairwise_similarities(top_record, bottom_record, &parameters)
+            .into_iter()
+            .map(|(method, value)| {
+                let is_active = method == active;
+                let text = if is_active {
+                    format!("{score:.4}")
+                } else {
+                    value.map_or_else(|| "n/a".to_string(), |score| format!("{score:.4}"))
+                };
+                (method, text, is_active)
+            })
+            .collect();
+
+    let top_mz = top_record.precursor_mz().to_f64();
+    let bottom_mz = bottom_record.precursor_mz().to_f64();
+    let rows = [
+        ("Top precursor m/z", format!("{top_mz:.4}")),
+        ("Bottom precursor m/z", format!("{bottom_mz:.4}")),
+        (
+            "Precursor delta",
+            format!("{:.4}", (top_mz - bottom_mz).abs()),
+        ),
+    ];
+
+    rsx! {
+        aside { class: "node-panel edge-panel",
+            div { class: "node-panel-head",
+                h3 { "{top_label} vs {bottom_label}" }
+                button {
+                    r#type: "button",
+                    class: "node-panel-close",
+                    title: "Close the edge comparison panel",
+                    aria_label: "Close the spectral comparison panel",
+                    onclick: move |_| {
+                        edge_selected.set(None);
+                        edge_hovered.set(None);
+                    },
+                    "\u{00d7}"
+                }
+            }
+            if !pinned {
+                p { class: "node-panel-hint", "Click the edge to keep this open." }
+            }
+            div { class: "spectrum-wrap",
+                MirrorSpectrumPlot {
+                    top: top_peaks,
+                    bottom: bottom_peaks,
+                    tolerance,
+                    top_label,
+                    bottom_label,
+                }
+            }
+            div { class: "edge-similarities",
+                h4 { class: "edge-sim-title", "All similarity measures" }
+                for (method , text , is_active) in sim_rows {
+                    div {
+                        key: "{method.id()}",
+                        class: if is_active { "edge-sim-row active" } else { "edge-sim-row" },
+                        title: method.description(),
+                        span { class: "edge-sim-name",
+                            {similarity_icon(method, if is_active { method.accent().to_string() } else { "#627077".to_string() })}
+                            span { "{method.label()}" }
+                        }
+                        span { class: "edge-sim-value", "{text}" }
+                    }
+                }
+            }
             dl { class: "kv",
                 for (label , value) in rows {
                     dt { "{label}" }
@@ -1079,6 +1309,198 @@ fn SpectrumPlot(peaks: Vec<(f64, f64)>) -> Element {
             }
         }
         div { class: "spectrum-readout", {readout} }
+    }
+}
+
+/// Renders two spectra as a mirror (butterfly) plot: the `top` spectrum's peaks
+/// rise above a shared m/z axis and the `bottom` spectrum's peaks hang below it.
+///
+/// Each spectrum is scaled to its own most intense peak, so the comparison is of
+/// relative intensities. Fragment peaks that match a peak in the other spectrum
+/// within `tolerance` daltons are drawn in the match colour, which is the visual
+/// shorthand for why the two spectra are considered similar.
+#[component]
+fn MirrorSpectrumPlot(
+    top: Vec<(f64, f64)>,
+    bottom: Vec<(f64, f64)>,
+    tolerance: f64,
+    top_label: String,
+    bottom_label: String,
+) -> Element {
+    // The hovered peak, as (is_top, peak index).
+    let mut hovered = use_signal(|| None::<(bool, usize)>);
+    if top.is_empty() && bottom.is_empty() {
+        return rsx! {
+            p { class: "node-panel-hint", "No peaks to display." }
+        };
+    }
+
+    let width = 340.0_f64;
+    let height = 220.0_f64;
+    let pad_left = 6.0_f64;
+    let pad_right = 6.0_f64;
+    let pad_top = 12.0_f64;
+    let pad_bottom = 22.0_f64;
+    let center_y = (pad_top + (height - pad_bottom)) / 2.0;
+    // Each half spans from the centre axis to its padding edge.
+    let half = center_y - pad_top;
+    let plot_width = width - pad_left - pad_right;
+
+    let min_mz = top
+        .iter()
+        .chain(bottom.iter())
+        .map(|peak| peak.0)
+        .fold(f64::INFINITY, f64::min);
+    let max_mz = top
+        .iter()
+        .chain(bottom.iter())
+        .map(|peak| peak.0)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let span_mz = (max_mz - min_mz).max(1e-6);
+    let max_top = top
+        .iter()
+        .map(|peak| peak.1)
+        .fold(0.0_f64, f64::max)
+        .max(f64::EPSILON);
+    let max_bottom = bottom
+        .iter()
+        .map(|peak| peak.1)
+        .fold(0.0_f64, f64::max)
+        .max(f64::EPSILON);
+
+    let matches = |mz: f64, other: &[(f64, f64)]| {
+        other
+            .iter()
+            .any(|&(other_mz, _)| (mz - other_mz).abs() <= tolerance)
+    };
+
+    // Per peak: (index, x, y at the stick tip, matched).
+    let sticks_top: Vec<(usize, f64, f64, bool)> = top
+        .iter()
+        .enumerate()
+        .map(|(index, &(mz, intensity))| {
+            let x = pad_left + (mz - min_mz) / span_mz * plot_width;
+            let tip = center_y - (intensity / max_top) * half;
+            (index, x, tip, matches(mz, &bottom))
+        })
+        .collect();
+    let sticks_bottom: Vec<(usize, f64, f64, bool)> = bottom
+        .iter()
+        .enumerate()
+        .map(|(index, &(mz, intensity))| {
+            let x = pad_left + (mz - min_mz) / span_mz * plot_width;
+            let tip = center_y + (intensity / max_bottom) * half;
+            (index, x, tip, matches(mz, &top))
+        })
+        .collect();
+    let match_count = sticks_top.iter().filter(|stick| stick.3).count();
+
+    let top_color = "#205e8c";
+    let bottom_color = "#38755a";
+    let match_color = "#9d4133";
+
+    let current = hovered();
+    let readout = match current.and_then(|(is_top, index)| {
+        let source = if is_top { &top } else { &bottom };
+        source
+            .get(index)
+            .copied()
+            .map(|(mz, intensity)| (is_top, mz, intensity))
+    }) {
+        Some((is_top, mz, intensity)) => {
+            let side = if is_top { "top" } else { "bottom" };
+            rsx! {
+                span { class: "spectrum-value", "{side}: m/z {mz:.4}, intensity {intensity:.4}" }
+            }
+        }
+        None => rsx! {
+            span { class: "node-panel-hint", "Hover a peak to read its m/z and intensity." }
+        },
+    };
+
+    rsx! {
+        svg {
+            class: "spectrum",
+            view_box: "0 0 {width} {height}",
+            width: "100%",
+            onmouseleave: move |_| hovered.set(None),
+            line {
+                x1: "{pad_left}",
+                y1: "{center_y}",
+                x2: "{width - pad_right}",
+                y2: "{center_y}",
+                stroke: "#9aa0b0",
+                stroke_width: "1",
+            }
+            for (index , x , tip , matched) in sticks_top.iter().copied() {
+                line {
+                    x1: "{x}",
+                    y1: "{center_y}",
+                    x2: "{x}",
+                    y2: "{tip}",
+                    stroke: if matched { match_color } else { top_color },
+                    stroke_width: if current == Some((true, index)) { "3" } else if matched { "2" } else { "1" },
+                }
+            }
+            for (index , x , tip , matched) in sticks_bottom.iter().copied() {
+                line {
+                    x1: "{x}",
+                    y1: "{center_y}",
+                    x2: "{x}",
+                    y2: "{tip}",
+                    stroke: if matched { match_color } else { bottom_color },
+                    stroke_width: if current == Some((false, index)) { "3" } else if matched { "2" } else { "1" },
+                }
+            }
+            for (index , x , _tip , _matched) in sticks_top.iter().copied() {
+                line {
+                    x1: "{x}",
+                    y1: "{pad_top}",
+                    x2: "{x}",
+                    y2: "{center_y}",
+                    stroke: "rgba(0,0,0,0)",
+                    stroke_width: "6",
+                    style: "pointer-events: all;",
+                    onmouseenter: move |_| hovered.set(Some((true, index))),
+                }
+            }
+            for (index , x , _tip , _matched) in sticks_bottom.iter().copied() {
+                line {
+                    x1: "{x}",
+                    y1: "{center_y}",
+                    x2: "{x}",
+                    y2: "{height - pad_bottom}",
+                    stroke: "rgba(0,0,0,0)",
+                    stroke_width: "6",
+                    style: "pointer-events: all;",
+                    onmouseenter: move |_| hovered.set(Some((false, index))),
+                }
+            }
+            text { x: "{pad_left}", y: "{height - 6.0}", font_size: "9", fill: "#627077", "{min_mz:.1}" }
+            text {
+                x: "{width - pad_right}",
+                y: "{height - 6.0}",
+                font_size: "9",
+                fill: "#627077",
+                text_anchor: "end",
+                "{max_mz:.1}"
+            }
+        }
+        div { class: "spectrum-readout", {readout} }
+        div { class: "mirror-legend",
+            div { class: "mirror-legend-item",
+                span { class: "mirror-swatch", style: "background: {top_color};" }
+                span { class: "legend-label", "{top_label}" }
+            }
+            div { class: "mirror-legend-item",
+                span { class: "mirror-swatch", style: "background: {bottom_color};" }
+                span { class: "legend-label", "{bottom_label}" }
+            }
+            div { class: "mirror-legend-item",
+                span { class: "mirror-swatch", style: "background: {match_color};" }
+                span { class: "legend-label", "{match_count} matched" }
+            }
+        }
     }
 }
 

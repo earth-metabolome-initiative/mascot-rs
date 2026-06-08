@@ -16,12 +16,14 @@ use geometric_traits::prelude::{
     GenericEdgesBuilder, GenericVocabularyBuilder, UndiEdgesBuilder, UndiGraph,
 };
 use geometric_traits::traits::{
-    ConnectedComponents, EdgesBuilder, Louvain, LouvainConfig, VocabularyBuilder,
+    ConnectedComponents, EdgesBuilder, Leiden, LeidenConfig, Louvain, LouvainConfig,
+    VocabularyBuilder,
 };
 use mascot_rs::prelude::MascotGenericFormat;
 use mass_spectrometry::prelude::{
-    FlashCosineIndex, FlashEntropyIndex, FlashSearchResult, GenericSpectrum, SiriusMergeClosePeaks,
-    SpectraIndexBuilder, SpectralProcessor,
+    FlashCosineIndex, FlashEntropyIndex, FlashSearchResult, GenericSpectrum, LinearCosine,
+    LinearEntropy, ModifiedLinearCosine, ModifiedLinearEntropy, ScalarSimilarity,
+    SiriusMergeClosePeaks, SpectraIndexBuilder, SpectralProcessor,
 };
 
 /// The spectral similarity measure used to weight graph edges.
@@ -129,7 +131,7 @@ impl Default for GraphParams {
             mz_power: 0.0,
             intensity_power: 1.0,
             top_k: 10,
-            min_score: 0.7,
+            min_score: 0.3,
         }
     }
 }
@@ -144,14 +146,16 @@ pub struct SimilarityGraph {
     pub node_count: usize,
     /// Deduplicated undirected edges `(u, v, score)` with `u < v`.
     pub edges: Vec<Edge>,
-    /// Connected-component label per node.
-    pub component_of_node: Vec<usize>,
     /// Number of connected components.
     pub component_count: usize,
     /// Louvain community label per node.
     pub community_of_node: Vec<usize>,
     /// Number of Louvain communities.
     pub community_count: usize,
+    /// Leiden community label per node.
+    pub leiden_of_node: Vec<usize>,
+    /// Number of Leiden communities.
+    pub leiden_count: usize,
     /// 2D layout coordinate per node, index-aligned with the dataset.
     pub coordinates: Vec<[f64; 2]>,
 }
@@ -279,6 +283,68 @@ pub fn compute_edges(
     }
 }
 
+/// All four pairwise similarity scores between two spectra.
+///
+/// Scores are computed directly (not via the top-k index) so an edge can report
+/// every measure, not just the one that built the graph. The two spectra are
+/// cleaned with the same `SiriusMergeClosePeaks` preprocessing and scored with
+/// the same tolerance and power settings as graph construction, so the active
+/// method's value matches the edge's graph weight. A method's score is `None`
+/// when it cannot be evaluated for this pair.
+#[must_use]
+pub fn pairwise_similarities(
+    left: &MascotGenericFormat,
+    right: &MascotGenericFormat,
+    params: &GraphParams,
+) -> Vec<(SimilarityMethod, Option<f64>)> {
+    let tolerance = params.mz_tolerance.max(1e-6);
+    let Ok(processor) = SiriusMergeClosePeaks::<f64>::new(tolerance) else {
+        return SimilarityMethod::ALL
+            .into_iter()
+            .map(|method| (method, None))
+            .collect();
+    };
+    let left = processor.process(left.as_ref());
+    let right = processor.process(right.as_ref());
+    SimilarityMethod::ALL
+        .into_iter()
+        .map(|method| (method, score_pair(method, params, &left, &right)))
+        .collect()
+}
+
+/// Scores one method for an already-cleaned spectrum pair.
+fn score_pair(
+    method: SimilarityMethod,
+    params: &GraphParams,
+    left: &GenericSpectrum<f64>,
+    right: &GenericSpectrum<f64>,
+) -> Option<f64> {
+    let mz_power = params.mz_power;
+    let intensity_power = params.intensity_power;
+    let tolerance = params.mz_tolerance;
+    let score = match method {
+        SimilarityMethod::Cosine => LinearCosine::new(mz_power, intensity_power, tolerance)
+            .ok()?
+            .similarity(left, right),
+        SimilarityMethod::ModifiedCosine => {
+            ModifiedLinearCosine::new(mz_power, intensity_power, tolerance)
+                .ok()?
+                .similarity(left, right)
+        }
+        // `weighted = true` matches the `FlashEntropyIndex` default used to build
+        // the graph, so this agrees with the entropy edge weights.
+        SimilarityMethod::Entropy => LinearEntropy::new(mz_power, intensity_power, tolerance, true)
+            .ok()?
+            .similarity(left, right),
+        SimilarityMethod::ModifiedEntropy => {
+            ModifiedLinearEntropy::new(mz_power, intensity_power, tolerance, true)
+                .ok()?
+                .similarity(left, right)
+        }
+    };
+    score.ok().map(|(value, _matches)| value)
+}
+
 /// Labels connected components of the undirected graph defined by `edges`.
 ///
 /// Returns `(component_count, component_of_node)`.
@@ -315,19 +381,35 @@ fn label_components(node_count: usize, edges: &[Edge]) -> Result<(usize, Vec<usi
 ///
 /// Returns `(community_count, community_of_node)`. With no edges, every node is
 /// its own community.
-fn label_communities(node_count: usize, edges: &[Edge]) -> Result<(usize, Vec<usize>), String> {
+/// The number of distinct labels in a partition.
+fn distinct_count(partition: &[usize]) -> usize {
+    let mut sorted = partition.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+    sorted.len()
+}
+
+/// A labelled community partition: `(count, label_per_node)`.
+type Partition = (usize, Vec<usize>);
+
+/// Labels Louvain and Leiden communities of the similarity-weighted graph.
+///
+/// Returns `(louvain, leiden)` partitions. With no edges, every node is its own
+/// community under both.
+fn label_communities(node_count: usize, edges: &[Edge]) -> Result<(Partition, Partition), String> {
     if edges.is_empty() {
-        return Ok((node_count, (0..node_count).collect()));
+        let trivial: Vec<usize> = (0..node_count).collect();
+        return Ok(((node_count, trivial.clone()), (node_count, trivial)));
     }
 
     let mut weighted: Vec<(usize, usize, f64)> = Vec::with_capacity(edges.len() * 2);
     for &(u, v, score) in edges {
-        // Louvain requires strictly positive, finite weights.
+        // Both algorithms require strictly positive, finite weights.
         let weight = score.max(1e-9);
         weighted.push((u, v, weight));
         weighted.push((v, u, weight));
     }
-    weighted.sort_unstable_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+    weighted.sort_unstable_by_key(|edge| (edge.0, edge.1));
 
     let matrix: ValuedCSR2D<usize, usize, usize, f64> = GenericEdgesBuilder::default()
         .expected_number_of_edges(weighted.len())
@@ -336,14 +418,19 @@ fn label_communities(node_count: usize, edges: &[Edge]) -> Result<(usize, Vec<us
         .build()
         .map_err(|error| format!("{error:?}"))?;
 
-    let result = Louvain::<usize>::louvain(&matrix, &LouvainConfig::default())
-        .map_err(|error| format!("{error:?}"))?;
-    let community_of_node = result.final_partition().to_vec();
+    let louvain = Louvain::<usize>::louvain(&matrix, &LouvainConfig::default())
+        .map_err(|error| format!("{error:?}"))?
+        .final_partition()
+        .to_vec();
+    let leiden = Leiden::<usize>::leiden(&matrix, &LeidenConfig::default())
+        .map_err(|error| format!("{error:?}"))?
+        .final_partition()
+        .to_vec();
 
-    let mut distinct = community_of_node.clone();
-    distinct.sort_unstable();
-    distinct.dedup();
-    Ok((distinct.len(), community_of_node))
+    Ok((
+        (distinct_count(&louvain), louvain),
+        (distinct_count(&leiden), leiden),
+    ))
 }
 
 /// Builds a full similarity graph: edges, component and community labels, and
@@ -354,16 +441,18 @@ pub fn build_graph(
 ) -> Result<SimilarityGraph, String> {
     let node_count = records.len();
     let edges = compute_edges(records, params)?;
-    let (component_count, component_of_node) = label_components(node_count, &edges)?;
-    let (community_count, community_of_node) = label_communities(node_count, &edges)?;
-    let coordinates = crate::layout::mds_layout(node_count, &edges);
+    let (component_count, _component_of_node) = label_components(node_count, &edges)?;
+    let ((community_count, community_of_node), (leiden_count, leiden_of_node)) =
+        label_communities(node_count, &edges)?;
+    let coordinates = crate::layout::compute(node_count, &edges);
     Ok(SimilarityGraph {
         node_count,
         edges,
-        component_of_node,
         component_count,
         community_of_node,
         community_count,
+        leiden_of_node,
+        leiden_count,
         coordinates,
     })
 }

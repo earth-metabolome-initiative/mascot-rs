@@ -1,61 +1,78 @@
-//! 2D layout of the similarity graph via classical MDS over graph distances.
+//! 2D layout of the similarity graph via ForceAtlas2.
 //!
-//! Edge weights are cosine-style distances (`1 - score`). All-pairs shortest
-//! paths over the (sparse) k-nearest-neighbour graph give a distance matrix
-//! that classical MDS projects to two dimensions. This reflects graph topology
-//! and consumes the sparse graph we already built, rather than a dense
-//! all-pairs similarity matrix. MDS is O(n^3), so it suits the small-to-medium
-//! datasets this view targets; a deterministic circular layout is used as a
-//! fallback when MDS does not apply or fails.
+//! The sparse, similarity-weighted k-nearest-neighbour graph is laid out with
+//! the ForceAtlas2 force-directed algorithm from `geometric-traits`: nodes
+//! repel each other, edges attract proportionally to their similarity, and a
+//! gravity term keeps disconnected components from drifting away. The layout is
+//! deterministic (fixed seed) and uses the Barnes-Hut approximation for larger
+//! graphs. A circular layout is used as a fallback for trivial inputs.
 
-use geometric_traits::impls::{PaddedMatrix2D, ValuedCSR2D};
-use geometric_traits::prelude::*;
-use geometric_traits::traits::{DenseValuedMatrix, EdgesBuilder};
+use geometric_traits::impls::ValuedCSR2D;
+use geometric_traits::prelude::GenericEdgesBuilder;
+use geometric_traits::traits::{EdgesBuilder, ForceAtlas2, ForceAtlas2Config};
 
 use crate::similarity::Edge;
 
-/// Weighted sparse matrix backing the shortest-path computation.
+/// Weighted, symmetric sparse matrix handed to ForceAtlas2.
 type WeightedCsr = ValuedCSR2D<usize, usize, usize, f64>;
 
-/// Computes 2D coordinates for each node.
+/// Iterations of ForceAtlas2 to run.
+const ITERATIONS: usize = 500;
+
+/// Repulsion scaling constant (`kr`); larger values spread the layout out.
+const SCALING_RATIO: f64 = 10.0;
+
+/// Gravity constant (`kg`); higher values keep disconnected nodes from being
+/// flung out, so the connected component fills more of the view.
+const GRAVITY: f64 = 8.0;
+
+/// Node count beyond which the Barnes-Hut repulsion approximation is enabled.
+const BARNES_HUT_THRESHOLD: usize = 1000;
+
+/// Computes 2D coordinates for each node using ForceAtlas2.
 ///
-/// Uses classical MDS over shortest-path graph distances, falling back to a
-/// deterministic circular layout for trivial graphs (fewer than three nodes)
-/// or if MDS fails.
+/// Falls back to a deterministic circular layout for trivial graphs (fewer than
+/// three nodes) or if the layout fails.
 #[must_use]
-pub fn mds_layout(node_count: usize, edges: &[Edge]) -> Vec<[f64; 2]> {
+pub fn compute(node_count: usize, edges: &[Edge]) -> Vec<[f64; 2]> {
     if node_count == 0 {
         return Vec::new();
     }
     if node_count < 3 {
         return circle_layout(node_count);
     }
-    try_mds_layout(node_count, edges).unwrap_or_else(|_| circle_layout(node_count))
+    force_atlas2_layout(node_count, edges).unwrap_or_else(|_| circle_layout(node_count))
 }
 
-/// Attempts a classical-MDS layout, returning an error describing any failure.
-fn try_mds_layout(node_count: usize, edges: &[Edge]) -> Result<Vec<[f64; 2]>, String> {
-    let distances = shortest_path_distances(node_count, edges)?;
-    let inner: WeightedCsr = GenericEdgesBuilder::<_, WeightedCsr>::default()
-        .expected_number_of_edges(0)
+/// Runs ForceAtlas2 over the similarity-weighted graph.
+fn force_atlas2_layout(node_count: usize, edges: &[Edge]) -> Result<Vec<[f64; 2]>, String> {
+    // ForceAtlas2 expects a symmetric weighted matrix, so add both directions.
+    // Edge weight is the similarity score (stronger pairs attract harder).
+    let mut weighted: Vec<(usize, usize, f64)> = Vec::with_capacity(edges.len() * 2);
+    for &(u, v, score) in edges {
+        let weight = score.max(0.0);
+        weighted.push((u, v, weight));
+        weighted.push((v, u, weight));
+    }
+    weighted.sort_unstable_by_key(|edge| (edge.0, edge.1));
+
+    let matrix: WeightedCsr = GenericEdgesBuilder::<_, WeightedCsr>::default()
+        .expected_number_of_edges(weighted.len())
         .expected_shape((node_count, node_count))
-        .edges(core::iter::empty())
+        .edges(weighted.into_iter())
         .build()
         .map_err(|error| format!("{error:?}"))?;
-    let n = node_count;
-    let padded = PaddedMatrix2D::new(
-        inner,
-        Box::new(move |coords: (usize, usize)| distances[coords.0 * n + coords.1])
-            as Box<dyn Fn((usize, usize)) -> f64>,
-    )
-    .map_err(|error| format!("{error:?}"))?;
 
-    let config = MdsConfig {
-        dimensions: 2,
-        ..MdsConfig::default()
+    let config = ForceAtlas2Config {
+        iterations: ITERATIONS,
+        scaling_ratio: SCALING_RATIO,
+        gravity: GRAVITY,
+        strong_gravity: true,
+        barnes_hut: node_count >= BARNES_HUT_THRESHOLD,
+        ..ForceAtlas2Config::default()
     };
-    let result = padded
-        .classical_mds(&config)
+    let result = matrix
+        .force_atlas2(&config)
         .map_err(|error| format!("{error:?}"))?;
 
     let coordinates = (0..node_count)
@@ -68,62 +85,6 @@ fn try_mds_layout(node_count: usize, edges: &[Edge]) -> Result<Vec<[f64; 2]>, St
         })
         .collect();
     Ok(coordinates)
-}
-
-/// Builds a dense, flat (row-major) distance matrix from graph shortest paths.
-///
-/// Pairs in different connected components (unreachable) are filled with 1.5x
-/// the largest finite distance, pushing components apart while keeping every
-/// entry finite for MDS.
-fn shortest_path_distances(node_count: usize, edges: &[Edge]) -> Result<Vec<f64>, String> {
-    let mut weighted: Vec<(usize, usize, f64)> = Vec::with_capacity(edges.len() * 2);
-    for &(u, v, score) in edges {
-        let distance = (1.0 - score).max(0.0);
-        weighted.push((u, v, distance));
-        weighted.push((v, u, distance));
-    }
-    weighted.sort_unstable_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
-
-    let csr: WeightedCsr = GenericEdgesBuilder::<_, WeightedCsr>::default()
-        .expected_number_of_edges(weighted.len())
-        .expected_shape((node_count, node_count))
-        .edges(weighted.into_iter())
-        .build()
-        .map_err(|error| format!("{error:?}"))?;
-    let paths = csr
-        .pairwise_dijkstra()
-        .map_err(|error| format!("{error:?}"))?;
-
-    let mut max_finite = 0.0_f64;
-    for i in 0..node_count {
-        for j in 0..node_count {
-            if let Some(distance) = paths.value((i, j)) {
-                if distance.is_finite() && distance > max_finite {
-                    max_finite = distance;
-                }
-            }
-        }
-    }
-    let fill = if max_finite > 0.0 {
-        max_finite * 1.5
-    } else {
-        1.0
-    };
-
-    let mut flat = vec![0.0_f64; node_count * node_count];
-    for i in 0..node_count {
-        for j in 0..node_count {
-            flat[i * node_count + j] = if i == j {
-                0.0
-            } else {
-                paths
-                    .value((i, j))
-                    .filter(|distance| distance.is_finite())
-                    .unwrap_or(fill)
-            };
-        }
-    }
-    Ok(flat)
 }
 
 /// A deterministic layout placing nodes evenly on a unit circle.

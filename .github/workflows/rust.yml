@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install nightly toolchain (wasm)
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check for dead CSS
         run: bash scripts/check-dead-css.sh
 
@@ -56,7 +56,7 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-tarpaulin
@@ -64,7 +64,7 @@ jobs:
       - name: Generate coverage
         run: cargo tarpaulin -p mascot-rs --engine llvm --out Xml --output-dir coverage
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: true
           files: coverage/cobertura.xml

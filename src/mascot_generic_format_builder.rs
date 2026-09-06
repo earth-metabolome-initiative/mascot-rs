@@ -193,7 +193,11 @@ mod tests {
             })
         ));
         builder.digest_peak_line("100.0 0.0")?;
-        assert!(builder.peaks.is_empty());
+        assert!(
+            builder.peaks.is_empty(),
+            "a zero-intensity peak line should be filtered out, found {:?}",
+            builder.peaks
+        );
 
         Ok(())
     }

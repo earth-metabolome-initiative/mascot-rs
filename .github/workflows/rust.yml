@@ -1,0 +1,76 @@
+name: Rust
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - name: Build
+        run: cargo build -p mascot-rs --verbose
+      - name: Run tests
+        run: cargo test -p mascot-rs --verbose
+      - name: Run clippy
+        run: cargo clippy -p mascot-rs --all-targets --all-features -- -D warnings
+
+  web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install nightly toolchain (wasm)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+      - name: Build mascot-web (wasm)
+        run: cargo build -p mascot-web --target wasm32-unknown-unknown --verbose
+      - name: Clippy mascot-web (wasm)
+        run: cargo clippy -p mascot-web --target wasm32-unknown-unknown --all-targets -- -D warnings
+
+  dead-css:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check for dead CSS
+        run: bash scripts/check-dead-css.sh
+
+  coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@cargo-tarpaulin
+      - name: Generate coverage
+        run: cargo tarpaulin -p mascot-rs --engine llvm --out Xml --output-dir coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: coverage/cobertura.xml
+          fail_ci_if_error: true
+          # The action verifies the downloaded CLI against a GPG key it fetches
+          # from keybase.io, which is flaky and intermittently aborts the upload
+          # with "Can't check signature: No public key". Skip that integrity
+          # check; the CLI is still fetched over HTTPS from cli.codecov.io.
+          skip_validation: true

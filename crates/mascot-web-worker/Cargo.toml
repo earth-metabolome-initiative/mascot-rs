@@ -1,0 +1,22 @@
+[package]
+name = "mascot-web-worker"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luca Cappelletti <cappelletti.luca94@gmail.com>"]
+description = "Dedicated wasm Web Worker that builds mascot-web similarity graphs off the main thread"
+repository = "https://github.com/LucaCappelletti94/mascot-rs"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+js-sys = "0.3"
+mascot-web-core = { path = "../mascot-web-core" }
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["DedicatedWorkerGlobalScope", "MessageEvent"] }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

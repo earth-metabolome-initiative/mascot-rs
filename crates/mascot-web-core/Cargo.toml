@@ -1,0 +1,18 @@
+[package]
+name = "mascot-web-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luca Cappelletti <cappelletti.luca94@gmail.com>"]
+description = "Shared graph-building core for the mascot-web app and its Web Worker"
+repository = "https://github.com/LucaCappelletti94/mascot-rs"
+license = "MIT"
+publish = false
+
+[dependencies]
+geometric-traits = { git = "https://github.com/earth-metabolome-initiative/geometric-traits", default-features = false, features = ["alloc"] }
+mascot-rs = { path = "../..", default-features = false }
+mass_spectrometry = { git = "https://github.com/earth-metabolome-initiative/mass-spectrometry-traits", default-features = false }
+serde = { version = "1", features = ["derive"] }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

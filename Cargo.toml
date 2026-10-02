@@ -1,0 +1,74 @@
+[workspace]
+members = ["crates/mascot-web", "crates/mascot-web-core", "crates/mascot-web-worker"]
+resolver = "2"
+
+[package]
+name = "mascot-rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luca Cappelletti <cappelletti.luca94@gmail.com>"]
+description = "A library to read mascot spectra files"
+homepage = "https://github.com/LucaCappelletti94/mascot-rs"
+repository = "https://github.com/LucaCappelletti94/mascot-rs"
+readme = "README.md"
+license = "MIT"
+keywords = ["mascot", "format", "spectrography"]
+categories = [
+    "science",
+]
+
+[dependencies]
+flate2 = { version = "1.0", default-features = false, features = ["rust_backend"], optional = true }
+indicatif = { version = "0.18", default-features = false, optional = true }
+mass_spectrometry = { git = "https://github.com/earth-metabolome-initiative/mass-spectrometry-traits", default-features = false }
+mem_dbg = { version = "0.4", default-features = false, features = ["derive", "half"], optional = true }
+molecular-formulas = { version = "0.1.10", default-features = false }
+smiles-parser = { git = "https://github.com/earth-metabolome-initiative/smiles-parser", rev = "ad15ce7205f4e3ad842f5eaa153d562f3548bd79", default-features = false }
+thiserror = { version = "2.0", default-features = false }
+ureq = { version = "3.3", optional = true }
+zenodo-rs = { version = "0.1.7", default-features = false, features = ["checksums", "rustls-ring-tls"], optional = true }
+zstd = { version = "0.13", default-features = false, optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["net", "rt", "time"] }
+
+[features]
+default = ["std", "mem_dbg"]
+std = [
+    "dep:flate2",
+    "dep:indicatif",
+    "dep:ureq",
+    "dep:zenodo-rs",
+    "dep:zstd",
+    "mass_spectrometry/std",
+    "mem_dbg?/std",
+    "thiserror/std",
+]
+mem_size = [
+    "dep:mem_dbg",
+    "mass_spectrometry/mem_size",
+]
+mem_dbg = [
+    "std",
+    "mem_size",
+    "mass_spectrometry/mem_dbg",
+]
+
+[lints.rust]
+missing_docs = "deny"
+warnings = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+dbg_macro = "deny"
+multiple_crate_versions = "allow"
+expect_used = "deny"
+panic = "deny"
+print_stderr = "deny"
+print_stdout = "deny"
+todo = "deny"
+unimplemented = "deny"
+unwrap_used = "deny"

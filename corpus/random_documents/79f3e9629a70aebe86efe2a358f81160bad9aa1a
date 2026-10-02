@@ -1,0 +1,18 @@
+BEGIN IONS
+IDENTIFIER=MassSpecGymID0000001
+SMILES=CCO
+INCHNT_TYPE=OrbitrapONT_MASS=56.041865
+PRECURSOR_MZ=47.049141
+ADDUCT=[M+H]80.50215+
+IYP=SpecGymID0000002
+SOURCE_INSTRUMENT=PRECCHARGE=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+PRECURSOR_FORMULA=C2H7ONT_MASS=56.041865
+PRECURSOR_MZ=47.049141
+ADDbbbbbbURSOR_MZ=5.URSOR_MZ=0.0
+MSLEEL=M-ER=MassSpecGymID0000002
+SOURCE_INSTRUMENT=bURSOR_MZ=5.URSOR_MZ=0.0
+MSLEEL=wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwÅàààwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwM-ER=MassSpecGymID0000002
+SOE=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbSOR_MZ=150.0150.0
+INSTRUMENT_TYPE=Orbitrap
+75..01
+E 0ND IONS

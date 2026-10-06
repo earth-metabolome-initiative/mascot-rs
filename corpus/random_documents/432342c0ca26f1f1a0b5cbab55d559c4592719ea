@@ -1,0 +1,7 @@
+BEGIN IONS
+CHARGURE_ID=3S
+SMILES=COC(=N3)n(n1#)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)=O)(=o)Nc(c(F)2)c(F)ccc2
+CAS=145N5OFEATURE_ID=3S
+SMILES=COC(=N3)n(n1#)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)=O)(=o)Nc(c(F)2)c(F)ccc2
+CAS=145PMASS=166.086BE2
+SCAGIN

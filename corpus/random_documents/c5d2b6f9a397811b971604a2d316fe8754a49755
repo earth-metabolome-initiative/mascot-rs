@@ -1,0 +1,18 @@
+BEGIN IONS
+IDENTIFIER=MassSpecGymID000000`1
+SMILES=CCO
+INCHIKEY=LFQSCWFLJHTTHZ
+FORMULA=CSSSSSSSSSSSSSSSSSSSSSSTSSSSSSSSSSSSSSSSSSSSSSSSSSSS3------------------SSSSSSSSSSSSSSSSS73.7703933SSSSSS------------------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS---------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSS3--------------------------SS-----------SSSSSSSSSSSSSSSSSr2-----------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSS3---------------------------------------------------------------------------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSS3----------------------------------------------------SSSSSSSSSSS3----------------------------------------------------------------------------SSSSSSSSSSSSSSSSSr3------------------------------------------------------------------------------SSSSSSSSSSSSSSr2-----------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSS3----------------------------------------------------------------------------SSSSSSSSSSSSSSSSSr3-------------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSr3-------------------------------------------------------------------------------------IN IONS
+IDENTIFIER=MassSpecGymID0000001
+SMILES=CCO
+INCHIKEY=LFQSCWSSSSSSSSSSSSSSSSS---------------SSSSSSSSSSSSSSSSSS3--------------------------SSSSSSSSSSSSS---------------------------------SSSSSSSSSSSSSTSSSSSSSSSSSSSSSSSSSSSSSSSSSS3---------------------------------------.-------------SSSSSSSSSSSSSS---------------SSSSSSSSSSSSSSSSSSSSSSSSSS3---|--------------------------------------Sitrap
+COLLISION_ENERGY=20.0
+FOLD=train
+SIMU]ATITION_CHALLENGE=True
+31.0184 1.0
+45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿÿÿÿÿ 1.0
+45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ

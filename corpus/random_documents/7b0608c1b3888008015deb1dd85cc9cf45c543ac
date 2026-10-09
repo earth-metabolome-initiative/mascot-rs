@@ -1,0 +1,15 @@
+BEGIN IONS
+IDENTIFIER=MassSpecGymID0000001
+SMILES=CCO
+INCHIKEY=LFQSCWFLJHTTHZ
+FORMULA=CSSSSSSSSSSSS----------SSSSSSSSSSSSSSSSSSSSSSSSSS3----------------------------------------------------------------------------SSSSSSSSS-------SSSSSSSSSSSSSSSSSS3--------------------------SSSSSSSSSSSSSSSSSSSSSSSSSS3----------YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY--------------------------------------SSSS5----------------------.SSSSSSINCHIKTS3--------------------------SSSSSSSSSSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSDSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS3---------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSS3--------------------------------------U--------H6O
+PWEC-RSOR_FGRMULA=C2HRSOR_MZ=46.049141
+ADDUCT=[M+H]+
+INSTRUMDNT_TYPE=Orbitrap
+COLLISION_ENERGY=20.0
+FOLD=train
+SIMU]ATITION_CHALLENGE=True
+31.0184 1.0
+45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿSSSSSSSS3-----------------------------ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ

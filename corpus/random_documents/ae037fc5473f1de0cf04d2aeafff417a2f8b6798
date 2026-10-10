@@ -1,0 +1,27 @@
+BEGIN IONS
+IDENTIFIER=MassSpecGymID0000001
+SMILES=CCO
+INCHIKEY=LFQSCWFLJHTTHZ
+FORMULA=CSSSSSSSSSSSSSSSSSSSSSSTSSSSSSSSSSSSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSS74.7703933SSSSSS------------------------------------------SSSSSSSSSSSSSSSS-------SSSSSSSSSSSSSSSSSSSWSSSSSSSSSSSSS-------------------------------------------------SSSSSSSSSSSSSSSSS74.7703933SSSSSS------------------------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSS-------SSSSSSSSSSSSSSSSSSSWSSSSSSSSSSSSS------------------------------------------------SSSSSSSSSSSSSSSSN IONSSS3--------------------------SSSSSSSS[SSSSSS---------------SSSSSSS]SSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSSSSSS3-------------------------------49141
+ADDUCT=[M+H]+
+INSTRUMDNT_TYPE=Orbitrap
+COLLISION_ENERGYOLD=train
+SIMU]ATITION_CHALLENGE=True
+31.0184 1.0
+45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿÿÿÿÿ 1.0
+45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ------------------------------------------------SSSSSSSSSSSSSSSSN IONSSS3--------------------------SSSSSSSS[SSSSSS---------------SSSSSSS]SSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSSSSSS3------------------_CHALLENGE=True
+31.0184 1.0
+45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿÿÿÿÿ 1.0
+45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ45.0335 0.5
+END IONS
+BEGÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ

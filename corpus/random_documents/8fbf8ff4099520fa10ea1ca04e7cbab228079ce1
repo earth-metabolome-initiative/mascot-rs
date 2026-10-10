@@ -1,0 +1,25 @@
+BEGIN IONS
+IDENTIFIER=MassSpecGymID0000001
+SMILES=CCO
+INCHIKEY=LFQSCWFLJHTTHZ
+FORMULA=CSSSSSSSSSSSSSSSSSSSSSSTSSSSSSSSSSSSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSSSSSSSSSS----------------------------------------------------------SSSSSSSSSSSSS73.7703933SSSSS3--------------------------SSSSSSSSSSFSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------SS1-------------------------------------N----------------------------------------------------------SSSSSSSSSSSSSSSSSSSWSSSSSSSSSSSSS------------------------------------------------SSSSSSSSSSSSSSSSSS3--------------------------SSSSSSSSSSSSSS---------------SSSSSSSSSSSSSSSSSSSSSSSSSS3------------------------------------------SSSSSSSSSSSS---------------SSSSSSSSSSSSSSSSSSSSSSSSSS3----------------------------------------------------------------------SSSSSSSSSSSSSSSSSS3--------------------------SSSSSSSSSSSSSSSSSSSSSSSSSS3---------------------------------------------------SSSSSSSSSSSSSTSSSSSSSSSSSSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSS--------------------SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS---------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSS3--------------------------SSSSSSSSSSSSSSSSSSSSSSSSSS3-----SSSSSSSSSSSSSSSS3--------------------------SSSSSSSSSSSSSSSSSSSSSSSSSS3---------------------------------------------------SSSSSSSSSSSSSTSSSSSSSSSSSSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSSWSSSSSSSSSSSSS------------------------------------------------SSSSSSSSSSSSSSSSSS3--------------------------SSSSSSSSSSSSSS---------------SSSSSSSSSSSSSSSSSSSSSSSSSS3------------------------------------------SSSSSSSSSSSS---------------SSSSSSSSSSSSSSSSSSSSSSSSSS3----------------------------------------------------------------------SSSSSSSSSSSSSSSSSS3--------------------------SSSSSSSSSSSSSSSSSSSSSSSSSS3---------------------------------------------------SSSSSSSSSSSSSTSSSSSSSSSSSSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSSWSSSSSSSSSSSSS-------------SSSSSSSS---------------SSSSSSSSSSSSSSSSSSSSSSSSSS3------------------------------------------SSSSSSSSSSSS---------------SSSSSSSSSSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSSSSSSSSTSSSSSSSSSSSSSSSSSSSSSSSSSSSS3--------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS3-----------------------------------------------------------------------------------------------SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS---------------------------------------------------------------------------------------SSSS
+PARENT_MASS=46.041865
+PRECURSOR_MZ=47.049141
+ADDUCT=[M+H]+
+INSTRUMENT_TYPE=Orbitrap
+COLLISION_ENERGY=20.0
+FOLD=train
+SIMULALATION_CHALLENGE=True
+=93.0184 1.0
+45.0335 0.5
+END SIMULATION_CHALLENGE=True
+31.0184 1.0
+45.0335 0.5
+END IONS
+BEGIN IONS
+IDENTIFIER=MassSpMassSpecGymID00IFIER=MasSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS3-------------------------------------------------------------------------BEGIN IONS
+SYNON0646 1.7MENT_TYPE=LC-ESI-QQ
+INSTRUMENT=QuattroPremier XE, Waters
+COLLISION_ENERGY=81----------------------SSSSSSSSSSSSSS V
+FORMULA=C12H8F3N5O3S
+SMILES=COC(=N3)n(n1)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)2SSSSSSSSSSSSSSS

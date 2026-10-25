@@ -11,7 +11,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - uses: actions/checkout@v7
@@ -27,7 +27,7 @@ jobs:
         run: cargo clippy -p mascot-rs --all-targets --all-features -- -D warnings
 
   web:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - uses: actions/checkout@v7
@@ -42,7 +42,7 @@ jobs:
         run: cargo clippy -p mascot-web --target wasm32-unknown-unknown --all-targets -- -D warnings
 
   dead-css:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - uses: actions/checkout@v7
@@ -50,7 +50,7 @@ jobs:
         run: bash scripts/check-dead-css.sh
 
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write

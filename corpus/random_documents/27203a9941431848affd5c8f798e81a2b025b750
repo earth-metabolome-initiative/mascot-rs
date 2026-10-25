@@ -1,0 +1,6 @@
+BEGIN IONS
+CERGY=40 V
+FORMULA=C11H8F3N5O3S+++++++++++++++++++++++++++++3+++Ti+++++2+++++++
+SMILES=COC(=N3)OOOOOoOOOOOOcC3=nS(=O)(=O)Nc(c(F):2)c(F)ccc2
+CnChI=/S/C12H1-9.0 0-9.0 0.00800801
+END IONS

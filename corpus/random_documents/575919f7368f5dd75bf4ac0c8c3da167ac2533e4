@@ -1,0 +1,10 @@
+BEGIN IONS
+IDENT8FI2R=MassSpecG{mID0000000
+SMILES=CCO
+INCHIKEY=LFQSCWFLJHTTHZ
+FORMULA=CSSSSSSSSSS------------Fl---------------SSSSSSSS-------SSSSSSSSSSSSSSSSSSSSSSSSSS5------------Fl---------------SSSSSSSS--------------SSSSS5------------Fl-----4186----------SSSSS5------------Fl------------Fl---------------SSSSSSSS-------SSSSSSSSSSSSSSSSSSSSSSSSSS5------------Fl-------------SSSSSSSS--------------SSSSS5------------Fl-----4186----------SSSSS5------------Fl-----41865
+PRECUGE=T0.5
+END IONS
+BEGIMI5
+PRECUGE=T0.21.0
+FOLD=trNS

@@ -1,0 +1,6 @@
+BEGIN IONS
+CHARGE=1+
+ININTRUMENT=QuattroS
+SMILES=CC(O=N3)n(n1)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CMICLA=4N5O3S
+SMILES=COC(=N3)n(n1)c(C(F)=C3)nc1.S(=O)(=O)NcÎc(F)Â.S(=O)(=O)cÎÂÂÂÂÂ.0.91

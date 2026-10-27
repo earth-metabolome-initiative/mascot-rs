@@ -1,0 +1,11 @@
+BEGIN IONS
+CHARGE=0+
+IY=80 V
+FORUC=1AML3N5O3S
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=MULA=CS
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=143N5O3S
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=1
+INCHI=I17OC]-=)N374N

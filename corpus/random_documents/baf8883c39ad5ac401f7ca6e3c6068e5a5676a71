@@ -1,7 +1,0 @@
-BEGIN IONS
-CHARGE=1+
-INCHIKEY=QZXRMULA=C12H8F3N5O3S
-SMILES=ClOC(=N3)n(n1)c(Cpppppppppppppppppppppppppppppppppppppppppp(ppF)=C3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
-CAS=1451.0COMPUT
-SMILES=ClOC(=N3)n(n1)c(Cpppppppppppppppppppppppppppppppppppppppppp(ppF)=C3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
-CAS=145ECURSOR_MZ=783 3.0-49

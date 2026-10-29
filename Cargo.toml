@@ -27,7 +27,7 @@ smiles-parser = { git = "https://github.com/earth-metabolome-initiative/smiles-p
 thiserror = { version = "2.0", default-features = false }
 ureq = { version = "3.3", optional = true }
 zenodo-rs = { version = "0.1.7", default-features = false, features = ["checksums", "rustls-ring-tls"], optional = true }
-zstd = { version = "0.13", default-features = false, optional = true }
+zstd = { version = "0.14.3", default-features = false, optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["net", "rt", "time"] }

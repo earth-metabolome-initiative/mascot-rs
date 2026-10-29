@@ -1,0 +1,6 @@
+BEGIN IONS
+SMILES=COI(=N3N)n(n1)c(C(F)=C3)cnS1(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=D_[12H'8F3N5O3S
+SMILES=COI(=N3)n(n1)C(C(F)=C3)cnS1(=O)(=O)Nc(c(F)2)c(F)ccc2
+C(C(F)1(=o)F)Nccc2
+CA

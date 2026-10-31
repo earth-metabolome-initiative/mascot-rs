@@ -1,6 +1,0 @@
-BEGIN IONS
-FEATURE_ID=103
-=C1
-SMILES=COC(=N3)n(n1)c(C(F)=C3)nc1S(=O)(=O)N
-SMILES=FOC(=N3)n(n1)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
-HI=InChI=1S/CtOS

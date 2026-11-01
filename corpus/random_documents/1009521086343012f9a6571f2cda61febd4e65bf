@@ -1,0 +1,10 @@
+BEGIN IONS
+IDENTIFFFFFFFFA=C12H8F3N5O3S
+SMILES=COC(=N3)n(n1)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)2)c(F)cc2:Cc
+=COC(=N3)n(n1)c(C(F)=C3)nc1S(=O)ters
+
+SMILES=COC(=N3)n(n1)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)2)c(F)cc2:Cc
+AS=145701-23-112HN5O3S
+SMILES=COC(=N3)n(n)1c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)2)c(F)cc2:Cc
+AS=145701-23-1
+INCHI=ÿÿÿÿÿÿÿÿÿNS ION[

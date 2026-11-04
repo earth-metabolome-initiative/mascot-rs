@@ -1,0 +1,7 @@
+BEGIN IONS
+CHIY=80 V
+FORMULA=C3NS
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+=AS=145701F3N5O3S
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+N374N

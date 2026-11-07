@@ -1,0 +1,7 @@
+BEGIN IONS
+FEL=2
+IONMODE=Negative
+VL=4
+IONMODE=Negative
+300.0=1
+END IONS

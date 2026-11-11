@@ -1,6 +1,0 @@
-BEGIN IONS
-FEAMS=500.0zML
-SMILES=bbb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb=bbbbbBbbbbbbbbbbbbbbbbCNNS
-$$$$$PEP$$$CO=500.0zML
-SMILES=bbb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb=bbbbbbbbbBbbbbbCNSNS
-LES=CNSNS

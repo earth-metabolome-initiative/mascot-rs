@@ -1,0 +1,5 @@
+BEGIN IONS
+SMILES=CO/C(=NO)/c(c(F)2)c(F)ccc2
+CHIKE=LC-3S
+SMILES=CO/C(N)=O/c(c(F)2)c(F)ccc2
+CVEL==samp2

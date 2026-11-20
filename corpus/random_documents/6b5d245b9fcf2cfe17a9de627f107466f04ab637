@@ -1,0 +1,6 @@
+BEGIN IONS
+DEINT=
+SMILES=C
+IN=MOLE5O3S
+SMILES=COC(=N3)n(n(cC)1(F)=C3)nc1S(=O)(=O)Nc(c(F):)c(F)cC
+c0

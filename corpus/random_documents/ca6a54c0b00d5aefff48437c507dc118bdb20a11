@@ -1,0 +1,6 @@
+BEGIN IONS
+T[PE=LC-ESI3S
+SMILES=COC(:N3(1nn))c(C(F)=C3)nc1S(c(F)2)c(F)ccc2
+CAS=14S
+SMILES=COC(=N3(1nn))c(C(F)=C3)nc1S(=O)(=O)Nc(cN3(1nn))c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)2)cccc2
+C2M

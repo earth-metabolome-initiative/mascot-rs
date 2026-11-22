@@ -1,0 +1,6 @@
+BEGIN IONS
+
+SMILES=COc(:N3(1nn))c(C(F)=C3)nc1S(c(F)2)c(F)ccc2
+CAS=1453S
+SMILES=COC(:N3(1nn))c(C(F)=C3)nc1S(c(F)2)c(F)ccc2
+CAZ      ORMRM

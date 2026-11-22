@@ -1,0 +1,7 @@
+BEGIN IONS
+CHARGE=1+
+=C18F35O3S
+SMILES=COC(=N3)n(n1)c(C(F)=C3)nc1I(=O)(=O)S
+CHARG>=F3
+SMILES=COC(=N3)n(n:1)c(C(F)=C3)nc1I(=O)(=N3)n(n1)c(C(F)=C3)nc1I(=O)(=O)S
+CHARG>(c(F)c0051

@@ -1,0 +1,16 @@
+BEGIN IONS
+CHARGE=0+
+C(:F)=C/5O.S
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=1455O3S
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=1IY=80 V
+FORMULA=C12H8F3N5O3S
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=14FORMULA=C12H8F3N5O.S
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=1457
+FORMULA=C12H8F3N5O3S
+SMILES=COC(=N3)(1nn)c(C(:F)=C/3)nc1S(=O)(=O)Nc(c(F)2)c(F)ccc2
+CAS=14FC3C(F)=CN=C`(OC]-=)N375N

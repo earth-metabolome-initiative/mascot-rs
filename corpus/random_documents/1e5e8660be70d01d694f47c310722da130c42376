@@ -1,0 +1,8 @@
+BEGIN IONS
+CHARGE=2+
+INCHIKATID=3S
+SMILES=COC(=N3)n(n1#)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)=O)(=o)Nc(c(F)2)c(F)ccc2
+CID=3S
+SMILES=COC(=N3)n(n1#)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)=O)(=o)Nc(c(F)2)c(F)ccc2
+CASSMILES=S=H-UHFFF_TYPETURE_ID=3S
+SMILES=COC(=N3)n(n1#)c(C(F)=C3)nc1S(=O)(=O)Nc(c(F)=O)ÿB

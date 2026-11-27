@@ -1,28 +1,0 @@
-BEGIN IONS
-IDENTIFIER=MassSpecGymID0000001
-SMILES=CCO
-INCHIKEY=LFQSCWFLJHTTHZ
-FORMULA=C2H6O
-PREC-RSOR_FGRMULA=C2H7O
-PARENT_MASS=46.041865
-PRECURSOR_MZ=47.049141
-ADDUCT=[M+H]+
-INSTRUMEION_ELATION_CHALLENGE=True
-31.0184 1.0
-45.0335 0.5
-END IONS
-BEGIN IONS
-IDENT[FIER=MassSpMaSpecG{mID0000000
-SMILES=CCO
-INCHIKEY=LFQSCWFLJHTTHZ
-FORMULA=CSSSSSSSSSS---------SSSSSSSSSSSSSSSSSSSSSSSSSS5------------Fl---------------SSSSSSSS--------------SSSSS5------------Fl-----4186-----------8372----------SSSSSSSSSSSSS--------Fl------------Fl---------------SSSSSSSSSS---------SSSSS5------------Fl--SSSSSSSSSSSSSSSSS----------Fl------------Fl---------------SSSSSSSS----Fl------------Fl----------------------SSSSSSSS-------SSSSSSSSSSSSSS---------SSSSS5------------Fl---------------Fl---------------SSSSSSSS-------SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS--------------SSSSS5------------Fl-----4186--------------SSSSSSSSSSSSSS---------SSSSS5------------Fl------------Fl---------------SSSSSSSS-------SSSSSSSSSSSSSSSSS----------Fl------------Fl---------------SSSSSSS----Fl--------4---Fl--------------------------Fl------------Fl---------------SSSSSSSS-----------------SSSSSSSS-------SSSSSSSS
-PRECURSOR_MZ=1.0
-ADD=FORMULA=(99S-H]-
-INSTRUMENT_TYPE=QTOF
-50.0 1.0
-END IONS
-BEGIN ISYPE=QTOF
-50.0 1.0
-END IONS
-BEGIN IONS
-IDER=Mass-----------SSSSSSSS-------SSSSSSSSSSSSSSSSS5------------Fl---------------SSSSSSSS--------------Sb
